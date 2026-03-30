@@ -10,6 +10,8 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   my_msg.msg
+  to_xycar.msg
+  from_xycar.msg
 )
 
 generate_messages(
