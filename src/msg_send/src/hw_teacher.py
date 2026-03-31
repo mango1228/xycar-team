@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # Xycar에서 실행 - msg_to_xycar 수신 후 greeting 회신
 
 import rospy
@@ -7,8 +8,8 @@ from msg_send.msg import from_xycar
 
 def callback(msg):
     reply = from_xycar()
-    reply.greeting = "Good afternoon, " + msg.last_name + " " + msg.first_name
-    print(reply.greeting)
+    reply.data = "Good afternoon, " + msg.last_name + " " + msg.first_name
+    print(reply.data)
     pub.publish(reply)
 
 rospy.init_node('teacher')

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # 리눅스 PC에서 실행 - msg_to_xycar 발행 후 msg_from_xycar 출력
 
 import rospy
@@ -6,7 +7,7 @@ from msg_send.msg import to_xycar
 from msg_send.msg import from_xycar
 
 def callback(msg):
-    print(msg.greeting)
+    print(msg.data)
 
 rospy.init_node('student')
 pub = rospy.Publisher('msg_to_xycar', to_xycar, queue_size=10)

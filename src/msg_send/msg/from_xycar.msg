@@ -1,1 +1,1 @@
-string greeting
+string data
