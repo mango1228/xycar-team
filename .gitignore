@@ -3,6 +3,7 @@ build/
 devel/
 logs/
 .catkin_workspace
+CMakeLists.txt
 
 # Python
 *.pyc
