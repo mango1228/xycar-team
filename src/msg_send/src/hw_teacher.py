@@ -9,10 +9,11 @@ from msg_send.msg import from_xycar
 def callback(msg):
     reply = from_xycar()
     reply.data = "Good afternoon, " + msg.last_name + " " + msg.first_name
-    print("msg.first_name = \"%s\"" % msg.first_name)
-    print("msg.last_name = \"%s\"" % msg.last_name)
-    print("msg.id_number = %d" % msg.id_number)
-    print("msg.phone_number = \"%s\"" % msg.phone_number)
+    
+    print("1. Name : ", msg.last_name + msg.first_name)
+    print("2. ID : ", msg.id_number)
+    print("3. Phone Number : ", msg.phone_number)
+    
     pub.publish(reply)
 
 rospy.init_node('teacher')
