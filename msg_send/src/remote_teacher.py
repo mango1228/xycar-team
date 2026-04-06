@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# 강사(Xycar)용 - my_msg 수신 후 이름을 String으로 회신
-
 import rospy
 from std_msgs.msg import String
 from msg_send.msg import my_msg
