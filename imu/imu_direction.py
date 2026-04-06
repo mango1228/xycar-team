@@ -22,6 +22,7 @@ def imu_callback(data):
   else:
     data_direction.direction = "forward"
 
+  print("direction: ", data_direction.direction)
   pub.publish(data_direction)
 
 rospy.init_node("Imu_Print")
