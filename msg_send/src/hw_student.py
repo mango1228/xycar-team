@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # 리눅스 PC에서 실행 - msg_to_xycar 발행 후 msg_from_xycar 출력
 
