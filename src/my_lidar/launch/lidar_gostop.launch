@@ -1,0 +1,15 @@
+<launch>
+
+    <!-- Motor node -->
+    <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
+
+    <!-- Lidar node -->
+    <include file="$(find xycar_lidar)/launch/lidar.launch" />
+
+    <!-- Driver node -->
+    <node name="lidar_driver"
+          pkg="my_lidar"
+          type="lidar_gostop.py"
+          output="screen" />
+
+</launch>
