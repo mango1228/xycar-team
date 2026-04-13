@@ -1,0 +1,15 @@
+<launch>
+
+    <!-- Motor node -->
+    <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
+
+    <!-- Lidar node -->
+    <include file="$(find xycar_lidar)/launch/xycar_lidar.launch" />
+
+    <!-- Driver node -->
+    <node name="week6_driver"
+          pkg="my_lidar"
+          type="week6.py"
+          output="screen" />
+
+</launch>
