@@ -1,0 +1,5 @@
+<launch>
+  <include file="$(find xycar_imu)/launch/xycar_imu_9dof.launch" />
+
+  <node pkg="imu_pkg" type="imu_direction.py" name="Imu_Print" output="screen" />
+</launch>
