@@ -1,3 +1,0 @@
-<launch>
-    <node pkg="msg_send" type="hw_teacher.py" name="teacher" output="screen" />
-</launch>
