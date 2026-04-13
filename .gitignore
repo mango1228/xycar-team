@@ -23,6 +23,9 @@ dist/
 .DS_Store
 Thumbs.db
 
+# 수업 자료 (PDF 용량 큼)
+class/
+
 # 센서 데이터 / 모델 파일 (용량 큼)
 *.bag
 *.pcd
