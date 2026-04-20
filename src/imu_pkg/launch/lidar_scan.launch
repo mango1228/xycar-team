@@ -1,0 +1,5 @@
+<launch>
+  <include file="$(find xycar_lidar)/launch/lidar.launch" />
+
+  <node name="my_lidar" pkg="imu_pkg" type="lidar_scan.py" output="screen" />
+</launch>
