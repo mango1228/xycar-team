@@ -1,0 +1,11 @@
+<launch>
+
+	<!-- Motor node -->
+	<include file="$(find xycar_motor)/launch/xycar_motor.launch"/>
+
+	<!-- USB Camera node -->
+	<include file="$(find usb_cam)/launch/usb_cam.launch"/>
+
+	<node name="h_drive" pkg="my_hough" type="h_drive_ex.py" output="screen"/>
+
+</launch>
