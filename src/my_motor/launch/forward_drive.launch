@@ -1,0 +1,9 @@
+<launch>
+
+  <!-- motor driver -->
+  <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
+
+  <!-- forward drive node -->
+  <node name="forward_drive" pkg="my_motor" type="forward_drive.py" output="screen"/>
+
+</launch>
