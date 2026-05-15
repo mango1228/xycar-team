@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import rospy
 from xycar_msgs.msg import xycar_motor
