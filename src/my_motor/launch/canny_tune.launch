@@ -1,10 +1,13 @@
 <launch>
 
+  <!-- 노출값: 실행 시 exposure:=140 처럼 덮어쓰기 가능. 낮을수록 어두움 -->
+  <arg name="exposure" default="162" />
+
   <!-- USB 카메라 (hough_drive.launch와 동일 파라미터) -->
   <node name="usb_cam" output="screen" pkg="usb_cam" type="usb_cam_node">
     <param name="video_device" value="/dev/videoCAM" />
     <param name="autoexposure" value="false" />
-    <param name="exposure" value="162" />   <!-- 영상이 너무 어둡/밝으면 이 값을 바꿔봐 -->
+    <param name="exposure" value="$(arg exposure)" />
     <param name="image_width" value="640" />
     <param name="image_height" value="480" />
     <param name="pixel_format" value="yuyv" />
