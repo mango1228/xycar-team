@@ -1,9 +1,12 @@
 <launch>
 
-  <!-- 노출값: 실행 시 exposure:=N 으로 덮어쓰기 가능. 낮을수록 어두움 -->
+  <!-- 노출값: 실행 시 exposure:=N 으로 덮어쓰기 가능. canny_tune 튜닝 때 쓴 값과 맞출 것 -->
   <arg name="exposure" default="110" />
 
-  <!-- USB 카메라 (hough_drive.launch와 동일 파라미터) -->
+  <!-- 모터 드라이버 -->
+  <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
+
+  <!-- USB 카메라 -->
   <node name="usb_cam" output="screen" pkg="usb_cam" type="usb_cam_node">
     <param name="video_device" value="/dev/videoCAM" />
     <param name="autoexposure" value="false" />
@@ -15,7 +18,7 @@
     <param name="io_method" value="mmap" />
   </node>
 
-  <!-- Canny/ROI 검증 노드 (모터 없음 - 차 안 움직임) -->
-  <node name="canny_tune" output="screen" pkg="my_motor" type="canny_tune.py" />
+  <!-- 차선주행 노드 -->
+  <node name="lane_drive" output="screen" pkg="my_motor" type="lane_drive.py" />
 
 </launch>
