@@ -1,7 +1,7 @@
 <launch>
 
-  <!-- 노출값: 실행 시 exposure:=140 처럼 덮어쓰기 가능. 낮을수록 어두움 -->
-  <arg name="exposure" default="162" />
+  <!-- 노출값: 실행 시 exposure:=N 으로 덮어쓰기 가능. 낮을수록 어두움 -->
+  <arg name="exposure" default="110" />
 
   <!-- USB 카메라 (hough_drive.launch와 동일 파라미터) -->
   <node name="usb_cam" output="screen" pkg="usb_cam" type="usb_cam_node">
