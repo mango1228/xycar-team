@@ -1,0 +1,24 @@
+<launch>
+
+  <!-- 노출값: 실행 시 exposure:=N 으로 덮어쓰기 가능. canny_tune 튜닝 때 쓴 값과 맞출 것 -->
+  <arg name="exposure" default="140" />
+
+  <!-- 모터 드라이버 -->
+  <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
+
+  <!-- USB 카메라 -->
+  <node name="usb_cam" output="screen" pkg="usb_cam" type="usb_cam_node">
+    <param name="video_device" value="/dev/videoCAM" />
+    <param name="autoexposure" value="false" />
+    <param name="exposure" value="$(arg exposure)" />
+    <param name="image_width" value="640" />
+    <param name="image_height" value="480" />
+    <param name="pixel_format" value="yuyv" />
+    <param name="camera_frame_id" value="usb_cam" />
+    <param name="io_method" value="mmap" />
+  </node>
+
+  <!-- 차선주행 노드 -->
+  <node name="lane_drive" output="screen" pkg="my_motor" type="lane_drive.py" />
+
+</launch>
