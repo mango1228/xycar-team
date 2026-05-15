@@ -1,0 +1,21 @@
+<launch>
+
+  <!-- 모터 드라이버 (xycar_ws에서 오버레이로) -->
+  <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
+
+  <!-- USB 카메라 (원본 auto_drive/hough_drive.launch와 동일 파라미터) -->
+  <node name="usb_cam" output="screen" pkg="usb_cam" type="usb_cam_node">
+    <param name="video_device" value="/dev/videoCAM" />
+    <param name="autoexposure" value="false" />
+    <param name="exposure" value="162" />
+    <param name="image_width" value="640" />
+    <param name="image_height" value="480" />
+    <param name="pixel_format" value="yuyv" />
+    <param name="camera_frame_id" value="usb_cam" />
+    <param name="io_method" value="mmap" />
+  </node>
+
+  <!-- 차선주행 노드 -->
+  <node name="hough_drive" output="screen" pkg="my_motor" type="hough_drive.py" />
+
+</launch>
