@@ -20,7 +20,7 @@ CANNY_HIGH = 100     # Canny 위 임계값
 OFFSET     = 340     # ROI 띠 시작 row
 GAP        = 40      # ROI 띠 높이
 GAIN       = 0.4     # 조향 P게인 (작을수록 둔감 -> 흔들림 적음)
-SPEED      = 3       # 주행 속도 (0~5)
+SPEED      = 5       # 주행 속도 (0~5)
 EMA_ALPHA  = 0.3     # 반폭 EMA 계수 (클수록 최신값에 민감)
 SHOW_DEBUG = True    # 디버그 창 표시 (헤드리스 실행이면 False)
 
