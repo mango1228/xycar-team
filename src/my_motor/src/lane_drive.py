@@ -5,6 +5,7 @@
 # 베이스: auto_drive/hough_drive.py 구조 (ROI 먼저 자르고 Hough)
 # 개선: 튜닝된 Canny 값 / 조향 클램프+게인 / prev_x 메모리 / 깔끔한 종료
 
+import os
 import rospy
 import numpy as np
 import cv2, math
@@ -20,6 +21,11 @@ GAP        = 40      # ROI 띠 높이
 GAIN       = 0.4     # 조향 P게인 (작을수록 둔감 -> 흔들림 적음)
 SPEED      = 3       # 주행 속도 (0~5)
 SHOW_DEBUG = True    # 디버그 창 표시 (헤드리스 실행이면 False)
+
+# 디스플레이 없으면 디버그 창 자동 끔 (no-display 상태에서 cv2.imshow가 segfault 내는 것 방지)
+if SHOW_DEBUG and not os.environ.get('DISPLAY'):
+    print("[lane_drive] DISPLAY 없음 - 디버그 창 비활성화 (창 보려면 ssh -Y 로 접속)")
+    SHOW_DEBUG = False
 
 WIDTH, HEIGHT = 640, 480
 
