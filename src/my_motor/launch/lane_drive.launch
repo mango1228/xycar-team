@@ -18,6 +18,9 @@
     <param name="io_method" value="mmap" />
   </node>
 
+  <!-- 라이다 드라이버 -->
+  <include file="$(find xycar_lidar)/launch/lidar_noviewer.launch" />
+
   <!-- 차선주행 노드 -->
   <node name="lane_drive" output="screen" pkg="my_motor" type="lane_drive.py" />
 
