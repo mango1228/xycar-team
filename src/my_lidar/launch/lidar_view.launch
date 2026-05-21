@@ -3,9 +3,16 @@
     <!-- LiDAR 드라이버 (xycar_ws의 xycar_lidar 패키지) -->
     <include file="$(find xycar_lidar)/launch/lidar_noviewer.launch" />
 
-    <!-- RViz: /scan 토픽 시각화 -->
+    <!-- 각도 오프셋 보정 노드: /scan -> /scan_corrected -->
+    <node name="scan_corrector" pkg="my_lidar" type="scan_corrector.py" output="screen" />
+
+    <!-- RViz: /scan_corrected 시각화 -->
     <node name="rviz_lidar" pkg="rviz" type="rviz"
           args="-d $(find my_lidar)/rviz/lidar_view.rviz"
+          output="screen" />
+
+    <!-- 슬라이더 GUI: scan_corrector 파라미터 실시간 조정 -->
+    <node name="rqt_reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure"
           output="screen" />
 
 </launch>

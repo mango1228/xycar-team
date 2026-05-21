@@ -9,11 +9,15 @@ import math
 import rospy
 from sensor_msgs.msg import LaserScan
 
-DIST_MIN      = 0.05  # 유효 최소 거리 (m)
-DIST_MAX      = 4.0   # 유효 최대 거리 (m)
-CLUSTER_GAP_M = 0.15  # 같은 장애물로 묶는 XY 거리 간격 (m)
-MIN_POINTS    = 3     # 클러스터 최소 포인트 수
-LOG_HZ        = 5     # 초당 최대 출력 횟수
+DIST_MIN        = 0.05  # 유효 최소 거리 (m)
+DIST_MAX        = 4.0   # 유효 최대 거리 (m)
+CLUSTER_GAP_M   = 0.15  # 같은 장애물로 묶는 XY 거리 간격 (m)
+MIN_POINTS      = 3     # 클러스터 최소 포인트 수
+LOG_HZ          = 5     # 초당 최대 출력 횟수
+
+# 라이다 장착 각도 보정 (도)
+# 정면 장애물이 x>0 으로 치우치면 음수, x<0 으로 치우치면 양수로 조정
+ANGLE_OFFSET_DEG = 0.0
 
 
 def xy_from_scan(ranges, angle_min, angle_inc):
@@ -24,7 +28,7 @@ def xy_from_scan(ranges, angle_min, angle_inc):
             continue
         if not (DIST_MIN < r < DIST_MAX):
             continue
-        rad = angle_min + i * angle_inc
+        rad = angle_min + i * angle_inc + math.radians(ANGLE_OFFSET_DEG)
         x = math.sin(rad) * r   # 오른쪽 +
         y = math.cos(rad) * r   # 전방 +
         pts.append((x, y))
