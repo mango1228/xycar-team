@@ -1,0 +1,11 @@
+<launch>
+
+    <!-- LiDAR 드라이버 (xycar_ws의 xycar_lidar 패키지) -->
+    <include file="$(find xycar_lidar)/launch/lidar_noviewer.launch" />
+
+    <!-- RViz: /scan 토픽 시각화 -->
+    <node name="rviz_lidar" pkg="rviz" type="rviz"
+          args="-d $(find my_lidar)/rviz/lidar_view.rviz"
+          output="screen" />
+
+</launch>
