@@ -19,7 +19,7 @@ def start():
 
         img = image.copy()
         display_img = img
-        
+
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blur_gray = cv2.GaussianBlur(gray, (5, 5), 0)
         edge_img = cv2.Canny(np.uint8(blur_gray), 30, 60)
@@ -168,7 +168,7 @@ def start():
         else:
             x_right = int((L_ROW - b_right) / m_right)
             prev_x_right = x_right
-        
+
         prev_x_left = x_left
         prev_x_right = x_right
 
@@ -195,4 +195,3 @@ def start():
 
 if __name__ == '__main__':
     start()
-
