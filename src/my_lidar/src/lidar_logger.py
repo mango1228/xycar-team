@@ -1,97 +1,98 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# lidar_logger.py - /scan 토픽을 받아 장애물의 각도/거리를 로그로 출력
-# 좌표계: angle=0 -> 정면(+y), angle>0 -> 오른쪽(+x), angle<0 -> 왼쪽(-x)
-# 기준: xycar 라이다는 차량 전방에 장착, index 180 = 정면
+# lidar_logger.py - /scan 토픽을 받아 장애물의 XY 좌표를 로그로 출력
+# 좌표계: x=sin(rad)*dist (오른쪽 +), y=cos(rad)*dist (전방 +)
+# xycar 라이다는 차량 전방에 장착 (xycar.md 15.3절 좌표계 기준)
 
 import math
 import rospy
 from sensor_msgs.msg import LaserScan
 
-DIST_MIN       = 0.05   # 유효 최소 거리 (m) - 센서 노이즈 제거
-DIST_MAX       = 4.0    # 유효 최대 거리 (m)
-CLUSTER_GAP    = 8      # 같은 장애물로 묶는 각도 간격 (도)
-MIN_POINTS     = 3      # 클러스터 최소 포인트 수 (너무 작은 노이즈 제거)
-FRONT_HALF_DEG = 180    # 전방 반원만 볼 경우 각도 제한 (180 = 전방 ±180 = 전체)
-LOG_HZ         = 5      # 초당 최대 출력 횟수
+DIST_MIN      = 0.05  # 유효 최소 거리 (m)
+DIST_MAX      = 4.0   # 유효 최대 거리 (m)
+CLUSTER_GAP_M = 0.15  # 같은 장애물로 묶는 XY 거리 간격 (m)
+MIN_POINTS    = 3     # 클러스터 최소 포인트 수
+LOG_HZ        = 5     # 초당 최대 출력 횟수
 
 
-def direction_str(angle_deg):
-    if angle_deg < -30:
-        return "왼쪽"
-    elif angle_deg > 30:
-        return "오른쪽"
-    else:
-        return "정면"
-
-
-def cluster_obstacles(points):
-    """(angle_deg, dist) 리스트 -> 클러스터별 (대표각도, 최근접거리, 방향) 리스트"""
-    if not points:
-        return []
-
-    points = sorted(points, key=lambda p: p[0])  # 각도 순 정렬
-
-    clusters = []
-    cur = [points[0]]
-    for angle, dist in points[1:]:
-        if angle - cur[-1][0] <= CLUSTER_GAP:
-            cur.append((angle, dist))
-        else:
-            clusters.append(cur)
-            cur = [(angle, dist)]
-    clusters.append(cur)
-
-    result = []
-    for cluster in clusters:
-        if len(cluster) < MIN_POINTS:
-            continue
-        closest_angle, closest_dist = min(cluster, key=lambda p: p[1])
-        result.append((closest_angle, closest_dist, direction_str(closest_angle)))
-
-    return result
-
-
-def scan_callback(data):
-    angle_min = data.angle_min
-    angle_inc = data.angle_increment
-    ranges    = data.ranges
-
-    points = []
+def xy_from_scan(ranges, angle_min, angle_inc):
+    """LaserScan ranges -> 유효한 (x, y) 리스트"""
+    pts = []
     for i, r in enumerate(ranges):
         if math.isnan(r) or math.isinf(r):
             continue
         if not (DIST_MIN < r < DIST_MAX):
             continue
-        angle_deg = math.degrees(angle_min + i * angle_inc)
-        if abs(angle_deg) > FRONT_HALF_DEG:
-            continue
-        points.append((angle_deg, r))
+        rad = angle_min + i * angle_inc
+        x = math.sin(rad) * r   # 오른쪽 +
+        y = math.cos(rad) * r   # 전방 +
+        pts.append((x, y))
+    return pts
 
-    obstacles = cluster_obstacles(points)
+
+def cluster_xy(pts):
+    """(x,y) 리스트를 거리 기반으로 클러스터링 -> 클러스터 리스트"""
+    if not pts:
+        return []
+
+    pts = sorted(pts, key=lambda p: math.atan2(p[0], p[1]))  # 각도 순 정렬
+
+    clusters = [[pts[0]]]
+    for x, y in pts[1:]:
+        cx, cy = clusters[-1][-1]
+        if math.sqrt((x - cx)**2 + (y - cy)**2) <= CLUSTER_GAP_M:
+            clusters[-1].append((x, y))
+        else:
+            clusters.append([(x, y)])
+
+    return clusters
+
+
+def obstacle_repr(cluster):
+    """클러스터 -> 중심 XY (가장 가까운 포인트 기준)"""
+    closest = min(cluster, key=lambda p: math.sqrt(p[0]**2 + p[1]**2))
+    x, y = closest
+    dist = math.sqrt(x**2 + y**2)
+
+    if y < 0:
+        fore = "후방"
+    elif abs(x) < 0.1:
+        fore = "정면"
+    elif x > 0:
+        fore = "오른쪽"
+    else:
+        fore = "왼쪽"
+
+    return x, y, dist, fore
+
+
+def scan_callback(data):
+    pts = xy_from_scan(data.ranges, data.angle_min, data.angle_increment)
+    clusters = cluster_xy(pts)
+    obstacles = [c for c in clusters if len(c) >= MIN_POINTS]
 
     if not obstacles:
-        rospy.loginfo_throttle(2.0, "[lidar_logger] 감지된 장애물 없음")
+        rospy.loginfo_throttle(2.0, "[lidar] 감지된 장애물 없음")
         return
 
-    # 거리 가까운 순으로 정렬해서 출력
-    obstacles.sort(key=lambda o: o[1])
+    infos = [obstacle_repr(c) for c in obstacles]
+    infos.sort(key=lambda o: o[2])  # 가까운 순
 
     parts = []
-    for angle_deg, dist, direction in obstacles:
-        parts.append("[%s] %+.0f도 %.2fm" % (direction, angle_deg, dist))
+    for x, y, dist, fore in infos:
+        parts.append("[%s] x=%+.2fm y=%.2fm (%.2fm)" % (fore, x, y, dist))
 
     rospy.loginfo_throttle(
         1.0 / LOG_HZ,
-        "[lidar_logger] 장애물 %d개  %s" % (len(obstacles), "  |  ".join(parts))
+        "[lidar] 장애물 %d개  %s" % (len(infos), "  |  ".join(parts))
     )
 
 
 def main():
     rospy.init_node('lidar_logger')
     rospy.Subscriber('/scan', LaserScan, scan_callback, queue_size=1)
-    rospy.loginfo("[lidar_logger] 시작 - /scan 구독 중...")
+    rospy.loginfo("[lidar] 시작 (전방+y 오른쪽+x)")
     rospy.spin()
 
 
