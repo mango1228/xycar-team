@@ -1,0 +1,12 @@
+<launch>
+
+    <!-- LiDAR 드라이버 -->
+    <include file="$(find xycar_lidar)/launch/lidar_noviewer.launch" />
+
+    <!-- 장애물 감지 로거 -->
+    <node name="lidar_logger"
+          pkg="my_lidar"
+          type="lidar_logger.py"
+          output="screen" />
+
+</launch>
