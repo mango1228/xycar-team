@@ -2,6 +2,8 @@
 
   <!-- 노출값: 실행 시 exposure:=N 으로 덮어쓰기 가능. canny_tune 튜닝 때 쓴 값과 맞출 것 -->
   <arg name="exposure" default="110" />
+  <!-- RViz: 실행 안 하려면 rviz:=false -->
+  <arg name="rviz" default="true" />
 
   <!-- 모터 드라이버 -->
   <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
@@ -23,5 +25,9 @@
 
   <!-- 차선주행 노드 -->
   <node name="lane_drive" output="screen" pkg="my_motor" type="lane_drive.py" />
+
+  <!-- RViz (rviz:=false 로 끌 수 있음) -->
+  <node if="$(arg rviz)" name="rviz" pkg="rviz" type="rviz"
+        args="-d $(find my_motor)/rviz/lane_drive.rviz" output="screen" />
 
 </launch>
