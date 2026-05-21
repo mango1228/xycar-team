@@ -7,6 +7,11 @@
          angle_offset_deg: 정면 장애물이 오른쪽으로 치우치면 음수, 왼쪽이면 양수 -->
     <node name="scan_corrector" pkg="my_lidar" type="scan_corrector.py" output="screen">
         <param name="angle_offset_deg" value="0.0" />
+        <!-- ROI 직사각형 범위 (단위: m, 차량 기준 x=좌우 y=전후) -->
+        <param name="roi_x_min" value="-0.5" />
+        <param name="roi_x_max" value="0.5"  />
+        <param name="roi_y_min" value="0.1"  />
+        <param name="roi_y_max" value="2.0"  />
     </node>
 
     <!-- RViz: /scan_corrected 시각화 -->
