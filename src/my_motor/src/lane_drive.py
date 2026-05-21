@@ -114,11 +114,13 @@ def get_lidar_center(pts):
     return max(0, min(WIDTH - 1, lidar_center)), bisector
 
 
-def _to_rviz(xo, yo):
-    """우리 좌표계 (x=sin*r, y=cos*r, offset 적용) -> RViz laser_frame (x=cos*r, y=sin*r)"""
-    cos_off = math.cos(math.radians(LIDAR_ANGLE_OFFSET))
-    sin_off = math.sin(math.radians(LIDAR_ANGLE_OFFSET))
-    return yo * cos_off + xo * sin_off, xo * cos_off - yo * sin_off
+def _undo_offset(xo, yo):
+    """offset 보정을 제거해 raw 각도 기준 좌표로 복원 (laser_frame 표시용).
+    우리 시스템: x=sin(angle+offset)*r, y=cos(angle+offset)*r
+    목표:        x=sin(angle)*r,        y=cos(angle)*r  (offset 없이)"""
+    c = math.cos(-math.radians(LIDAR_ANGLE_OFFSET))
+    s = math.sin(-math.radians(LIDAR_ANGLE_OFFSET))
+    return xo * c + yo * s, yo * c - xo * s
 
 
 def publish_roi_markers(pts, scan, bisector):
@@ -145,8 +147,7 @@ def publish_roi_markers(pts, scan, bisector):
                    ( LIDAR_ROI_X, LIDAR_ROI_Y_MAX),
                    (-LIDAR_ROI_X, LIDAR_ROI_Y_MAX),
                    (-LIDAR_ROI_X, LIDAR_ROI_Y_MIN)]:
-        rx, ry = _to_rviz(cx, cy)
-        p = GeoPoint(); p.x = rx; p.y = ry; p.z = 0.0
+        p = GeoPoint(); p.x = cx; p.y = cy; p.z = 0.0
         box.points.append(p)
     arr.markers.append(box)
 
@@ -162,7 +163,7 @@ def publish_roi_markers(pts, scan, bisector):
     pm.color.r = 1.0; pm.color.g = 0.0; pm.color.b = 0.0; pm.color.a = 1.0
     pm.lifetime = rospy.Duration(0.1)
     for x, y in pts:
-        rx, ry = _to_rviz(x, y)
+        rx, ry = _undo_offset(x, y)
         p = GeoPoint(); p.x = rx; p.y = ry; p.z = 0.0
         pm.points.append(p)
     arr.markers.append(pm)
@@ -181,10 +182,10 @@ def publish_roi_markers(pts, scan, bisector):
         arrow.lifetime = rospy.Duration(0.1)
         start = GeoPoint(); start.x = 0.0; start.y = 0.0; start.z = 0.0
         L = 0.4
-        xo = math.sin(bisector) * L
-        yo = -math.cos(bisector) * L   # 전방이 음수
-        rx, ry = _to_rviz(xo, yo)
-        end = GeoPoint(); end.x = rx; end.y = ry; end.z = 0.0
+        end = GeoPoint()
+        end.x = math.sin(bisector) * L
+        end.y = -math.cos(bisector) * L
+        end.z = 0.0
         arrow.points = [start, end]
         arr.markers.append(arrow)
 
