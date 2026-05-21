@@ -12,6 +12,8 @@ import numpy as np
 import cv2, math
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, LaserScan
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Point as GeoPoint
 from xycar_msgs.msg import xycar_motor
 
 # ===== 튜닝 파라미터 (canny_tune으로 검증) =====
@@ -47,9 +49,10 @@ CENTER_MARGIN = 90   # 좌/우 분리 시 중앙 여유 (이 안쪽 선은 무�
 
 image      = np.empty(shape=[0])
 lidar_scan = None
-bridge    = CvBridge()
-motor_pub = None
-motor_msg = xycar_motor()
+bridge     = CvBridge()
+motor_pub  = None
+marker_pub = None
+motor_msg  = xycar_motor()
 
 # 한쪽 차선 처리용 상태
 ema_half_width = None        # 반(half) 차선폭의 EMA. 양쪽 차선 처음 보면 설정됨
@@ -84,37 +87,99 @@ def get_lidar_roi_pts(scan):
     return pts
 
 
-def get_lidar_center(scan):
-    """라이다 ROI 포인트 -> 가장 넓은 빈 각도 구간의 중앙각 -> 픽셀 x 반환.
-    포인트가 없거나 scan이 None이면 None 반환."""
-    pts = get_lidar_roi_pts(scan)
+def get_lidar_center(pts):
+    """ROI 포인트 리스트 -> 가장 넓은 빈 각도 구간의 중앙각 -> (픽셀 x, bisector_rad).
+    포인트가 없으면 (None, None) 반환."""
     if not pts:
-        return None
+        return None, None
 
-    # ROI 경계의 최대 각도 범위 (가장 가까운 y=ROI_Y_MAX 기준)
     roi_angle_min = math.atan2(-LIDAR_ROI_X, -LIDAR_ROI_Y_MAX)
     roi_angle_max = math.atan2( LIDAR_ROI_X, -LIDAR_ROI_Y_MAX)
 
-    # 각 포인트를 원점 기준 각도로 변환 후 정렬
     angles = sorted([math.atan2(x, -y) for x, y in pts])
-    # ROI 범위 밖 각도는 클램프
     angles = [a for a in angles if roi_angle_min <= a <= roi_angle_max]
     if not angles:
-        return None
+        return None, None
 
-    # 빈 구간 목록: (구간 시작, 구간 끝)
     gaps = []
     gaps.append((roi_angle_min, angles[0]))
     for i in range(len(angles) - 1):
         gaps.append((angles[i], angles[i + 1]))
     gaps.append((angles[-1], roi_angle_max))
 
-    # 가장 큰 gap의 중앙 각도
-    largest = max(gaps, key=lambda g: g[1] - g[0])
+    largest  = max(gaps, key=lambda g: g[1] - g[0])
     bisector = (largest[0] + largest[1]) / 2.0
 
     lidar_center = int(WIDTH // 2 + bisector * LIDAR_CENTER_GAIN)
-    return max(0, min(WIDTH - 1, lidar_center))
+    return max(0, min(WIDTH - 1, lidar_center)), bisector
+
+
+def publish_roi_markers(pts, scan, bisector):
+    """RViz용 마커 발행: ROI 박스(초록), ROI 포인트(빨강), bisector 화살표(노랑)"""
+    if scan is None:
+        return
+    stamp    = scan.header.stamp
+    frame_id = scan.header.frame_id
+    arr      = MarkerArray()
+
+    # ── 1. ROI 박스 (초록 LINE_STRIP) ──────────────────────────────
+    box = Marker()
+    box.header.stamp    = stamp
+    box.header.frame_id = frame_id
+    box.ns   = "roi"
+    box.id   = 0
+    box.type = Marker.LINE_STRIP
+    box.action = Marker.ADD
+    box.scale.x = 0.02
+    box.color.r = 0.0; box.color.g = 1.0; box.color.b = 0.0; box.color.a = 1.0
+    box.lifetime = rospy.Duration(0.1)
+    for cx, cy in [(-LIDAR_ROI_X, LIDAR_ROI_Y_MIN),
+                   ( LIDAR_ROI_X, LIDAR_ROI_Y_MIN),
+                   ( LIDAR_ROI_X, LIDAR_ROI_Y_MAX),
+                   (-LIDAR_ROI_X, LIDAR_ROI_Y_MAX),
+                   (-LIDAR_ROI_X, LIDAR_ROI_Y_MIN)]:
+        p = GeoPoint(); p.x = cx; p.y = cy; p.z = 0.0
+        box.points.append(p)
+    arr.markers.append(box)
+
+    # ── 2. ROI 안 장애물 포인트 (빨강 POINTS) ───────────────────────
+    pm = Marker()
+    pm.header.stamp    = stamp
+    pm.header.frame_id = frame_id
+    pm.ns   = "roi"
+    pm.id   = 1
+    pm.type = Marker.POINTS
+    pm.action = Marker.ADD
+    pm.scale.x = 0.05; pm.scale.y = 0.05
+    pm.color.r = 1.0; pm.color.g = 0.0; pm.color.b = 0.0; pm.color.a = 1.0
+    pm.lifetime = rospy.Duration(0.1)
+    for x, y in pts:
+        p = GeoPoint(); p.x = x; p.y = y; p.z = 0.0
+        pm.points.append(p)
+    arr.markers.append(pm)
+
+    # ── 3. Bisector 화살표 (노랑 ARROW) ────────────────────────────
+    if bisector is not None:
+        arrow = Marker()
+        arrow.header.stamp    = stamp
+        arrow.header.frame_id = frame_id
+        arrow.ns   = "roi"
+        arrow.id   = 2
+        arrow.type = Marker.ARROW
+        arrow.action = Marker.ADD
+        arrow.scale.x = 0.03; arrow.scale.y = 0.06; arrow.scale.z = 0.06
+        arrow.color.r = 1.0; arrow.color.g = 1.0; arrow.color.b = 0.0; arrow.color.a = 1.0
+        arrow.lifetime = rospy.Duration(0.1)
+        start = GeoPoint(); start.x = 0.0; start.y = 0.0; start.z = 0.0
+        L = 0.4
+        end = GeoPoint()
+        end.x = math.sin(bisector) * L
+        end.y = -math.cos(bisector) * L   # 전방이 음수이므로 부호 반전
+        end.z = 0.0
+        arrow.points = [start, end]
+        arr.markers.append(arrow)
+
+    marker_pub.publish(arr)
 
 
 def drive(angle, speed):
@@ -232,9 +297,10 @@ def draw_debug(frame, center, mode, left, right, cam_center, lidar_c):
 
 
 def main():
-    global motor_pub
+    global motor_pub, marker_pub
     rospy.init_node('lane_drive')
-    motor_pub = rospy.Publisher('xycar_motor', xycar_motor, queue_size=1)
+    motor_pub  = rospy.Publisher('xycar_motor', xycar_motor, queue_size=1)
+    marker_pub = rospy.Publisher('/lane_drive/roi_markers', MarkerArray, queue_size=1)
     rospy.Subscriber('/usb_cam/image_raw', Image, img_callback)
     rospy.Subscriber('/scan', LaserScan, lidar_callback, queue_size=1)
     rospy.on_shutdown(lambda: drive(0, 0))           # 종료 시 정지 (killall 안 씀)
@@ -253,8 +319,11 @@ def main():
         center, mode, left, right = process(frame)
         cam_center = center
 
+        roi_pts         = get_lidar_roi_pts(lidar_scan)
+        lidar_c, bisector = get_lidar_center(roi_pts)
+        publish_roi_markers(roi_pts, lidar_scan, bisector)
+
         # 라이다 중앙 추종점과 비교 -> 더 중앙에서 먼 점을 사용
-        lidar_c = get_lidar_center(lidar_scan)
         if lidar_c is not None:
             if abs(lidar_c - WIDTH // 2) > abs(center - WIDTH // 2):
                 center = lidar_c
