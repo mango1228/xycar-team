@@ -114,6 +114,13 @@ def get_lidar_center(pts):
     return max(0, min(WIDTH - 1, lidar_center)), bisector
 
 
+def _to_rviz(xo, yo):
+    """우리 좌표계 (x=sin*r, y=cos*r, offset 적용) -> RViz laser_frame (x=cos*r, y=sin*r)"""
+    cos_off = math.cos(math.radians(LIDAR_ANGLE_OFFSET))
+    sin_off = math.sin(math.radians(LIDAR_ANGLE_OFFSET))
+    return yo * cos_off + xo * sin_off, xo * cos_off - yo * sin_off
+
+
 def publish_roi_markers(pts, scan, bisector):
     """RViz용 마커 발행: ROI 박스(초록), ROI 포인트(빨강), bisector 화살표(노랑)"""
     if scan is None:
@@ -138,7 +145,8 @@ def publish_roi_markers(pts, scan, bisector):
                    ( LIDAR_ROI_X, LIDAR_ROI_Y_MAX),
                    (-LIDAR_ROI_X, LIDAR_ROI_Y_MAX),
                    (-LIDAR_ROI_X, LIDAR_ROI_Y_MIN)]:
-        p = GeoPoint(); p.x = cx; p.y = cy; p.z = 0.0
+        rx, ry = _to_rviz(cx, cy)
+        p = GeoPoint(); p.x = rx; p.y = ry; p.z = 0.0
         box.points.append(p)
     arr.markers.append(box)
 
@@ -154,7 +162,8 @@ def publish_roi_markers(pts, scan, bisector):
     pm.color.r = 1.0; pm.color.g = 0.0; pm.color.b = 0.0; pm.color.a = 1.0
     pm.lifetime = rospy.Duration(0.1)
     for x, y in pts:
-        p = GeoPoint(); p.x = x; p.y = y; p.z = 0.0
+        rx, ry = _to_rviz(x, y)
+        p = GeoPoint(); p.x = rx; p.y = ry; p.z = 0.0
         pm.points.append(p)
     arr.markers.append(pm)
 
@@ -172,10 +181,10 @@ def publish_roi_markers(pts, scan, bisector):
         arrow.lifetime = rospy.Duration(0.1)
         start = GeoPoint(); start.x = 0.0; start.y = 0.0; start.z = 0.0
         L = 0.4
-        end = GeoPoint()
-        end.x = math.sin(bisector) * L
-        end.y = -math.cos(bisector) * L   # 전방이 음수이므로 부호 반전
-        end.z = 0.0
+        xo = math.sin(bisector) * L
+        yo = -math.cos(bisector) * L   # 전방이 음수
+        rx, ry = _to_rviz(xo, yo)
+        end = GeoPoint(); end.x = rx; end.y = ry; end.z = 0.0
         arrow.points = [start, end]
         arr.markers.append(arrow)
 
