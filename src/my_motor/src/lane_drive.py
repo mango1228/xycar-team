@@ -11,17 +11,24 @@ import rospy
 import numpy as np
 import cv2, math
 from cv_bridge import CvBridge
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, LaserScan
 from xycar_msgs.msg import xycar_motor
 
 # ===== 튜닝 파라미터 (canny_tune으로 검증) =====
+# LiDAR ROI 튜닝값 (실측)
+LIDAR_ANGLE_OFFSET = -4.0   # 장착 각도 보정 (도)
+LIDAR_ROI_X        =  0.2   # 좌우 범위 (±m)
+LIDAR_ROI_Y_MIN    = -0.6   # 전방 시작 (m, 음수=전방)
+LIDAR_ROI_Y_MAX    = -0.2   # 전방 끝 (m)
+
 CANNY_LOW  = 40      # Canny 아래 임계값
 CANNY_HIGH = 100     # Canny 위 임계값
 OFFSET     = 340     # ROI 띠 시작 row
 GAP        = 40      # ROI 띠 높이
-GAIN       = 0.4     # 조향 P게인 (작을수록 둔감 -> 흔들림 적음)
-SPEED      = 5       # 주행 속도 (0~5)
-EMA_ALPHA  = 0.3     # 반폭 EMA 계수 (클수록 최신값에 민감)
+GAIN              = 0.4    # 조향 P게인 (작을수록 둔감 -> 흔들림 적음)
+SPEED             = 5      # 주행 속도 (0~5)
+EMA_ALPHA         = 0.3    # 반폭 EMA 계수 (클수록 최신값에 민감)
+LIDAR_CENTER_GAIN = 200.0  # 라이다 중앙 추종점 변환 게인 (px/rad)
 SHOW_DEBUG = True    # 디버그 창 표시 (헤드리스 실행이면 False)
 
 # 디스플레이 없으면 디버그 창 자동 끔 (no-display에서 cv2.imshow가 segfault 내는 것 방지)
@@ -38,8 +45,9 @@ HOUGH_MAX_GAP   = 10
 
 CENTER_MARGIN = 90   # 좌/우 분리 시 중앙 여유 (이 안쪽 선은 무시)
 
-image = np.empty(shape=[0])
-bridge = CvBridge()
+image      = np.empty(shape=[0])
+lidar_scan = None
+bridge    = CvBridge()
 motor_pub = None
 motor_msg = xycar_motor()
 
@@ -51,6 +59,62 @@ prev_center    = WIDTH // 2  # 직전 중점 (검출 실패 시 유지)
 def img_callback(data):
     global image
     image = bridge.imgmsg_to_cv2(data, "bgr8")
+
+
+def lidar_callback(data):
+    global lidar_scan
+    lidar_scan = data
+
+
+def get_lidar_roi_pts(scan):
+    """LaserScan에서 ROI 박스 안의 포인트 (x, y) 리스트를 반환. scan이 None이면 []"""
+    if scan is None:
+        return []
+    offset_rad = math.radians(LIDAR_ANGLE_OFFSET)
+    pts = []
+    for i, r in enumerate(scan.ranges):
+        if math.isnan(r) or math.isinf(r) or r < 0.01:
+            continue
+        rad = scan.angle_min + i * scan.angle_increment + offset_rad
+        x   = math.sin(rad) * r
+        y   = math.cos(rad) * r   # 전방이 음수
+        if (-LIDAR_ROI_X <= x <= LIDAR_ROI_X and
+                LIDAR_ROI_Y_MIN <= y <= LIDAR_ROI_Y_MAX):
+            pts.append((x, y))
+    return pts
+
+
+def get_lidar_center(scan):
+    """라이다 ROI 포인트 -> 가장 넓은 빈 각도 구간의 중앙각 -> 픽셀 x 반환.
+    포인트가 없거나 scan이 None이면 None 반환."""
+    pts = get_lidar_roi_pts(scan)
+    if not pts:
+        return None
+
+    # ROI 경계의 최대 각도 범위 (가장 가까운 y=ROI_Y_MAX 기준)
+    roi_angle_min = math.atan2(-LIDAR_ROI_X, -LIDAR_ROI_Y_MAX)
+    roi_angle_max = math.atan2( LIDAR_ROI_X, -LIDAR_ROI_Y_MAX)
+
+    # 각 포인트를 원점 기준 각도로 변환 후 정렬
+    angles = sorted([math.atan2(x, -y) for x, y in pts])
+    # ROI 범위 밖 각도는 클램프
+    angles = [a for a in angles if roi_angle_min <= a <= roi_angle_max]
+    if not angles:
+        return None
+
+    # 빈 구간 목록: (구간 시작, 구간 끝)
+    gaps = []
+    gaps.append((roi_angle_min, angles[0]))
+    for i in range(len(angles) - 1):
+        gaps.append((angles[i], angles[i + 1]))
+    gaps.append((angles[-1], roi_angle_max))
+
+    # 가장 큰 gap의 중앙 각도
+    largest = max(gaps, key=lambda g: g[1] - g[0])
+    bisector = (largest[0] + largest[1]) / 2.0
+
+    lidar_center = int(WIDTH // 2 + bisector * LIDAR_CENTER_GAIN)
+    return max(0, min(WIDTH - 1, lidar_center))
 
 
 def drive(angle, speed):
@@ -150,14 +214,17 @@ def process(frame):
     return center, mode, left, right
 
 
-def draw_debug(frame, center, mode, left, right):
+def draw_debug(frame, center, mode, left, right, cam_center, lidar_c):
     y = OFFSET + GAP // 2
     cv2.rectangle(frame, (0, OFFSET), (WIDTH-1, OFFSET+GAP), (0, 255, 0), 2)
-    for x1, y1, x2, y2 in left:                      # 검출 선분 (띠 좌표 -> 원본)
+    for x1, y1, x2, y2 in left:
         cv2.line(frame, (x1, y1+OFFSET), (x2, y2+OFFSET), (0, 0, 255), 2)
     for x1, y1, x2, y2 in right:
         cv2.line(frame, (x1, y1+OFFSET), (x2, y2+OFFSET), (255, 0, 0), 2)
-    cv2.circle(frame, (center, y),     6, (0, 255, 255),   -1)  # 중점 노랑
+    cv2.circle(frame, (cam_center, y), 6, (255, 128, 0),   -1)  # 카메라 중점 파랑
+    if lidar_c is not None:
+        cv2.circle(frame, (lidar_c, y), 6, (0, 0, 255),    -1)  # 라이다 중점 빨강
+    cv2.circle(frame, (center, y),     8, (0, 255, 255),    2)   # 최종 선택 중점 노랑 테두리
     cv2.circle(frame, (WIDTH//2, y),   6, (255, 255, 255), -1)  # 화면중심 흰
     cv2.putText(frame, mode, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
     cv2.imshow('lane_drive', frame)
@@ -169,6 +236,7 @@ def main():
     rospy.init_node('lane_drive')
     motor_pub = rospy.Publisher('xycar_motor', xycar_motor, queue_size=1)
     rospy.Subscriber('/usb_cam/image_raw', Image, img_callback)
+    rospy.Subscriber('/scan', LaserScan, lidar_callback, queue_size=1)
     rospy.on_shutdown(lambda: drive(0, 0))           # 종료 시 정지 (killall 안 씀)
 
     rospy.sleep(2.0)                                 # 카메라 준비 대기
@@ -183,6 +251,14 @@ def main():
 
         frame = image.copy()
         center, mode, left, right = process(frame)
+        cam_center = center
+
+        # 라이다 중앙 추종점과 비교 -> 더 중앙에서 먼 점을 사용
+        lidar_c = get_lidar_center(lidar_scan)
+        if lidar_c is not None:
+            if abs(lidar_c - WIDTH // 2) > abs(center - WIDTH // 2):
+                center = lidar_c
+                mode = mode + "+LIDAR"
 
         angle = (center - WIDTH // 2) * GAIN         # P 제어
         angle = max(-50, min(50, angle))             # ±50 클램프 -> 흔들림 억제
@@ -190,7 +266,7 @@ def main():
         drive(angle, SPEED)
 
         if SHOW_DEBUG:
-            draw_debug(frame, center, mode, left, right)
+            draw_debug(frame, center, mode, left, right, cam_center, lidar_c)
 
         count += 1
         if count % 30 == 0:
