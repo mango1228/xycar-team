@@ -19,11 +19,11 @@ LOG_HZ         = 5      # 초당 최대 출력 횟수
 
 def direction_str(angle_deg):
     if angle_deg < -30:
-        return u"왼쪽"
+        return "왼쪽"
     elif angle_deg > 30:
-        return u"오른쪽"
+        return "오른쪽"
     else:
-        return u"정면"
+        return "정면"
 
 
 def cluster_obstacles(points):
@@ -72,7 +72,7 @@ def scan_callback(data):
     obstacles = cluster_obstacles(points)
 
     if not obstacles:
-        rospy.loginfo_throttle(2.0, u"[lidar_logger] 감지된 장애물 없음")
+        rospy.loginfo_throttle(2.0, "[lidar_logger] 감지된 장애물 없음")
         return
 
     # 거리 가까운 순으로 정렬해서 출력
@@ -80,18 +80,18 @@ def scan_callback(data):
 
     parts = []
     for angle_deg, dist, direction in obstacles:
-        parts.append(u"[%s] %+.0f도 %.2fm" % (direction, angle_deg, dist))
+        parts.append("[%s] %+.0f도 %.2fm" % (direction, angle_deg, dist))
 
     rospy.loginfo_throttle(
         1.0 / LOG_HZ,
-        u"[lidar_logger] 장애물 %d개  %s" % (len(obstacles), u"  |  ".join(parts))
+        "[lidar_logger] 장애물 %d개  %s" % (len(obstacles), "  |  ".join(parts))
     )
 
 
 def main():
     rospy.init_node('lidar_logger')
     rospy.Subscriber('/scan', LaserScan, scan_callback, queue_size=1)
-    rospy.loginfo(u"[lidar_logger] 시작 - /scan 구독 중...")
+    rospy.loginfo("[lidar_logger] 시작 - /scan 구독 중...")
     rospy.spin()
 
 
