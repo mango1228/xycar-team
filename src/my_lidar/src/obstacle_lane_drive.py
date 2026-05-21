@@ -40,25 +40,24 @@ HOUGH_MIN_LEN   = 20
 HOUGH_MAX_GAP   = 10
 
 # -- LiDAR --
-# 정면 ±각도 범위 (장애물 감지용)
-FRONT_HALF_DEG  = 30    # 정면 ±30°
-SIDE_HALF_DEG   = 60    # 측면 ±60° (터널 벽 감지)
+# 장애물 감지 ROI (XY 좌표, 단위: m)
+ANGLE_OFFSET_DEG = -4.0  # 라이다 장착 각도 보정
+ROI_X            = 0.2   # 좌우 범위 (-ROI_X ~ +ROI_X)
+ROI_X_MIN        = -ROI_X
+ROI_X_MAX        =  ROI_X
+ROI_Y_MIN        = -0.6  # 전후 시작
+ROI_Y_MAX        = -0.1  # 전후 끝
+MIN_ROI_POINTS   = 2     # ROI 안 포인트가 이 수 이상이면 장애물로 판정
 
-# 인덱스 계산: LiDAR 360 포인트 기준
-#   인덱스 0 = 정면, 반시계 방향 증가 (xycar 기준)
-LIDAR_TOTAL = 360
-
-FRONT_L_IDX = LIDAR_TOTAL - FRONT_HALF_DEG   # 330
-FRONT_R_IDX = FRONT_HALF_DEG                  # 30
-
-LEFT_IDX_S  = LIDAR_TOTAL - SIDE_HALF_DEG    # 300
-LEFT_IDX_E  = LIDAR_TOTAL - 1                 # 359  (왼쪽 벽)
-RIGHT_IDX_S = 1
-RIGHT_IDX_E = SIDE_HALF_DEG                   # 60   (오른쪽 벽)
+# 터널 벽 감지 (측면, 각도 인덱스 기반 유지)
+SIDE_HALF_DEG   = 60
+LIDAR_TOTAL     = 360
+LEFT_IDX_S      = LIDAR_TOTAL - SIDE_HALF_DEG
+RIGHT_IDX_E     = SIDE_HALF_DEG
 
 # 장애물 판정 거리 임계값 (미터)
-OBSTACLE_DIST    = 0.7   # 이 거리 이내 = 장애물 존재
-TUNNEL_DIST      = 0.9   # 터널 모드 진입 벽 거리 기준
+OBSTACLE_DIST    = 0.7
+TUNNEL_DIST      = 0.9
 
 # 터널 모드: LiDAR 좌우 거리 균등 제어 게인
 TUNNEL_GAIN      = 30.0  # (좌거리 - 우거리) * TUNNEL_GAIN → 조향각
@@ -76,8 +75,8 @@ if SHOW_DEBUG and not os.environ.get('DISPLAY'):
 # 전역 상태
 # ====================================================================
 
-image        = np.empty(shape=[0])
-lidar_points = None
+image      = np.empty(shape=[0])
+lidar_scan = None
 bridge       = CvBridge()
 motor_pub    = None
 motor_msg    = xycar_motor()
@@ -99,8 +98,8 @@ def img_callback(data):
 
 
 def lidar_callback(data):
-    global lidar_points
-    lidar_points = list(data.ranges)
+    global lidar_scan
+    lidar_scan = data
 
 
 def drive(angle, speed):
@@ -174,60 +173,77 @@ def detect_lane(frame):
 # LiDAR 분석
 # ====================================================================
 
-def _valid_dist(pts, indices):
-    """인덱스 목록에서 유효한(inf/nan 제외) 최솟값 반환. 없으면 float('inf')"""
-    vals = []
-    for i in indices:
-        v = pts[i % LIDAR_TOTAL]
-        if not math.isinf(v) and not math.isnan(v) and v > 0.01:
-            vals.append(v)
-    return min(vals) if vals else float('inf')
-
-
-def analyze_lidar(pts):
+def analyze_lidar(scan):
     """
+    XY ROI 박스 기반 장애물 감지.
     Returns dict:
-        front_min   : 정면 최소 거리
-        front_angle : 장애물가 있는 경우 정면 기준 각도 (음수=왼쪽, 양수=오른쪽)
-        left_min    : 왼쪽 벽 최소 거리
-        right_min   : 오른쪽 벽 최소 거리
-        obstacle    : bool – 정면 장애물 존재 여부
-        tunnel      : bool – 양쪽 벽이 터널 기준 이내
+        front_min   : ROI 내 가장 가까운 장애물 거리
+        front_angle : 장애물 x 좌표 부호 (오른쪽=+, 왼쪽=-)
+        left_min    : 왼쪽 벽 최소 거리 (터널용)
+        right_min   : 오른쪽 벽 최소 거리 (터널용)
+        obstacle    : bool
+        tunnel      : bool
     """
-    if pts is None:
+    if scan is None:
         return None
 
-    # 정면 구간 (좌우 FRONT_HALF_DEG)
-    front_indices = list(range(0, FRONT_R_IDX + 1)) + list(range(FRONT_L_IDX, LIDAR_TOTAL))
+    offset_rad = math.radians(ANGLE_OFFSET_DEG)
+    angle_min  = scan.angle_min
+    angle_inc  = scan.angle_increment
+    ranges     = scan.ranges
 
-    # 정면 최솟값 및 방향 각도
-    front_min = float('inf')
-    front_angle = 0.0
-    for i in front_indices:
-        v = pts[i % LIDAR_TOTAL]
-        if not math.isinf(v) and not math.isnan(v) and v > 0.01:
-            if v < front_min:
-                front_min = v
-                # 각도 부호: 인덱스 0~180=오른쪽(+), 181~359=왼쪽(-)
-                deg = i if i <= 180 else i - 360
-                front_angle = float(deg)
+    roi_pts = []   # ROI 안 (x, y, dist)
+    left_vals, right_vals = [], []
 
-    left_indices  = list(range(LEFT_IDX_S, LIDAR_TOTAL))
-    right_indices = list(range(RIGHT_IDX_S, RIGHT_IDX_E + 1))
-    left_min  = _valid_dist(pts, left_indices)
-    right_min = _valid_dist(pts, right_indices)
+    for i, r in enumerate(ranges):
+        if math.isnan(r) or math.isinf(r) or r < 0.01:
+            continue
+        rad = angle_min + i * angle_inc + offset_rad
+        x   = math.sin(rad) * r
+        y   = math.cos(rad) * r
 
-    obstacle = (front_min < OBSTACLE_DIST)
-    # 터널 판정: 좌우 양쪽에 가까운 벽 존재 AND 정면 장애물 없음
+        # ROI 장애물 체크
+        if ROI_X_MIN <= x <= ROI_X_MAX and ROI_Y_MIN <= y <= ROI_Y_MAX:
+            roi_pts.append((x, y, r))
+
+        # 터널 벽 감지 (각도 인덱스 기반 유지)
+        deg = math.degrees(rad) % 360
+        if deg > 360 - SIDE_HALF_DEG:
+            left_vals.append(r)
+        elif deg < SIDE_HALF_DEG:
+            right_vals.append(r)
+
+    # ROI 내 가장 가까운 포인트 + x spread
+    front_min   = float('inf')
+    front_x     = 0.0
+    front_y     = ROI_Y_MIN
+    x_coverage  = 0.0   # ROI x폭 중 장애물이 차지하는 비율 (0~1)
+
+    if len(roi_pts) >= MIN_ROI_POINTS:
+        closest   = min(roi_pts, key=lambda p: p[2])
+        front_min = closest[2]
+        front_x   = closest[0]
+        front_y   = closest[1]
+
+        xs         = [p[0] for p in roi_pts]
+        x_spread   = max(xs) - min(xs)
+        x_coverage = min(1.0, x_spread / (2.0 * ROI_X))
+
+    left_min  = min(left_vals)  if left_vals  else float('inf')
+    right_min = min(right_vals) if right_vals else float('inf')
+
+    obstacle = len(roi_pts) >= MIN_ROI_POINTS
     tunnel   = (left_min < TUNNEL_DIST) and (right_min < TUNNEL_DIST) and not obstacle
 
     return {
-        'front_min'   : front_min,
-        'front_angle' : front_angle,
-        'left_min'    : left_min,
-        'right_min'   : right_min,
-        'obstacle'    : obstacle,
-        'tunnel'      : tunnel,
+        'front_min'  : front_min,
+        'front_x'    : front_x,      # 가장 가까운 장애물 x (오른쪽+, 왼쪽-)
+        'front_y'    : front_y,      # 가장 가까운 장애물 y (y_max=-0.1이 차량에 가장 가까움)
+        'x_coverage' : x_coverage,   # ROI x폭 점유율 (0~1)
+        'left_min'   : left_min,
+        'right_min'  : right_min,
+        'obstacle'   : obstacle,
+        'tunnel'     : tunnel,
     }
 
 
@@ -271,34 +287,41 @@ def compute_angle_lane(lpos, rpos):
 
 def compute_angle_avoid(lpos, rpos, lidar_info):
     """
-    MODE 2 – 장애물 회피:
-    장애물 각도에 따라 중점을 반대 방향으로 이동시켜 자연스럽게 회피.
-    장애물 거리에 비례해서 오프셋 크기 조절 (가까울수록 강하게).
+    MODE 2 – 장애물 회피.
+    오프셋 크기는 세 요소로 결정:
+      dist_factor   : y_max(-0.1)에 가까울수록 (차량에 가까울수록) 크게
+      x_factor      : x가 0(중앙)에 가까울수록 크게, ROI 끝(±0.2)이면 작게
+      coverage      : ROI x폭 중 장애물 점유율이 높을수록 크게
     """
-    global ema_half_width, prev_center
+    global prev_center
 
-    front_angle = lidar_info['front_angle']
-    front_dist  = lidar_info['front_min']
+    front_x    = lidar_info['front_x']
+    front_y    = lidar_info['front_y']
+    x_coverage = lidar_info['x_coverage']
 
-    # 거리 비례 오프셋: 거리가 가까울수록 오프셋 증가
-    dist_ratio = max(0.0, min(1.0, (OBSTACLE_DIST - front_dist) / OBSTACLE_DIST))
-    offset_px  = int(AVOID_OFFSET_PX * (1.0 + dist_ratio))
+    # 1. 거리 요소: y_max에 가까울수록 1, y_min에 가까울수록 0
+    roi_y_range  = ROI_Y_MAX - ROI_Y_MIN          # 0.5
+    dist_factor  = (front_y - ROI_Y_MIN) / roi_y_range
+    dist_factor  = max(0.0, min(1.0, dist_factor))
 
-    # 장애물이 오른쪽(+각도)이면 왼쪽으로, 왼쪽이면 오른쪽으로 회피
-    if front_angle >= 0:
-        direction = 1  # 왼쪽으로 이동
-    else:
-        direction = -1   # 오른쪽으로 이동
+    # 2. 중앙 근접 요소: x=0이면 1, x=±ROI_X이면 0
+    x_factor = 1.0 - abs(front_x) / ROI_X
+    x_factor = max(0.0, min(1.0, x_factor))
 
-    # 차선 기반 중점에 오프셋 추가
-    lane_angle, center, _ = compute_angle_lane(lpos, rpos)
+    # 3. 점유율 요소: coverage 그대로 (0~1)
 
-    # 차선 정보가 없을 때도 prev_center 기반으로 회피
-    avoid_center = np.clip(center + direction * offset_px, 0, WIDTH - 1)
-    prev_center  = int(avoid_center)
+    # 오프셋 합산: 기본 80px + 각 요소 최대 80px씩 추가 → 최대 320px
+    offset_px = int(AVOID_OFFSET_PX * (1.0 + dist_factor + x_factor + x_coverage))
+
+    # 회피 방향: front_x >= 0 이면 direction = 1, < 0 이면 -1
+    direction = 1 if front_x >= 0 else -1
+
+    _, center, _ = compute_angle_lane(lpos, rpos)
+    avoid_center = int(np.clip(center + direction * offset_px, 0, WIDTH - 1))
+    prev_center  = avoid_center
 
     angle = (avoid_center - WIDTH // 2) * GAIN
-    return angle, int(avoid_center), "AVOID"
+    return angle, avoid_center, "AVOID"
 
 
 def compute_angle_tunnel(lidar_info):
@@ -350,9 +373,11 @@ def draw_debug(frame, center, mode, left, right, lidar_info):
     cv2.putText(frame, mode, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
     if lidar_info:
-        info_str = "F:%.2f L:%.2f R:%.2f" % (
+        info_str = "F:%.2f x:%.2f cov:%.0f%% L:%.2f R:%.2f" % (
             lidar_info['front_min'],
-            lidar_info['left_min'] if not math.isinf(lidar_info['left_min']) else 9.99,
+            lidar_info['front_x'],
+            lidar_info['x_coverage'] * 100,
+            lidar_info['left_min']  if not math.isinf(lidar_info['left_min'])  else 9.99,
             lidar_info['right_min'] if not math.isinf(lidar_info['right_min']) else 9.99,
         )
         cv2.putText(frame, info_str, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
@@ -391,7 +416,7 @@ def main():
         lpos, rpos, left_lines, right_lines = detect_lane(frame)
 
         # ── LiDAR 분석 ────────────────────────────────────────────
-        lidar_info = analyze_lidar(lidar_points)
+        lidar_info = analyze_lidar(lidar_scan)
 
         # ── 모드 결정 및 조향각 산출 ──────────────────────────────
         # 우선순위: AVOID > TUNNEL > LANE

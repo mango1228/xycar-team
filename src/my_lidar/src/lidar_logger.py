@@ -17,7 +17,7 @@ LOG_HZ          = 5     # 초당 최대 출력 횟수
 
 # 라이다 장착 각도 보정 (도)
 # 정면 장애물이 x>0 으로 치우치면 음수, x<0 으로 치우치면 양수로 조정
-ANGLE_OFFSET_DEG = 0.0
+ANGLE_OFFSET_DEG = -4.0
 
 
 def xy_from_scan(ranges, angle_min, angle_inc):

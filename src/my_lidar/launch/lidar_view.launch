@@ -1,10 +1,10 @@
 <launch>
 
     <!-- 사용법: roslaunch my_lidar lidar_view.launch x:=0.5 y_max:=2.0 (생략 시 기본값 사용) -->
-    <arg name="offset" default="0.0"  />  <!-- 각도 보정 (도) -->
-    <arg name="x"      default="0.5"  />  <!-- ROI 좌우 반폭 (±x m) -->
-    <arg name="y_min"  default="0.1"  />  <!-- ROI 전방 시작 (m) -->
-    <arg name="y_max"  default="2.0"  />  <!-- ROI 전방 끝 (m) -->
+    <arg name="offset" default="-4.0"  />  <!-- 각도 보정 (도) -->
+    <arg name="x"      default="0.2"   />  <!-- ROI 좌우 반폭 (±x m) -->
+    <arg name="y_min"  default="-0.6"  />  <!-- ROI 시작 (m) -->
+    <arg name="y_max"  default="-0.1"  />  <!-- ROI 끝 (m) -->
 
     <!-- LiDAR 드라이버 (xycar_ws의 xycar_lidar 패키지) -->
     <include file="$(find xycar_lidar)/launch/lidar_noviewer.launch" />
