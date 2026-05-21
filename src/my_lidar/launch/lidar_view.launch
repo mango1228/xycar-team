@@ -1,17 +1,20 @@
 <launch>
 
+    <!-- 사용법: roslaunch my_lidar lidar_view.launch x:=0.5 y_max:=2.0 (생략 시 기본값 사용) -->
+    <arg name="offset" default="0.0"  />  <!-- 각도 보정 (도) -->
+    <arg name="x"      default="0.5"  />  <!-- ROI 좌우 반폭 (±x m) -->
+    <arg name="y_min"  default="0.1"  />  <!-- ROI 전방 시작 (m) -->
+    <arg name="y_max"  default="2.0"  />  <!-- ROI 전방 끝 (m) -->
+
     <!-- LiDAR 드라이버 (xycar_ws의 xycar_lidar 패키지) -->
     <include file="$(find xycar_lidar)/launch/lidar_noviewer.launch" />
 
-    <!-- 각도 오프셋 보정 노드: /scan -> /scan_corrected
-         angle_offset_deg: 정면 장애물이 오른쪽으로 치우치면 음수, 왼쪽이면 양수 -->
     <node name="scan_corrector" pkg="my_lidar" type="scan_corrector.py" output="screen">
-        <param name="angle_offset_deg" value="0.0" />
-        <!-- ROI 직사각형 범위 (단위: m, 차량 기준 x=좌우 y=전후) -->
-        <param name="roi_x_min" value="-0.5" />
-        <param name="roi_x_max" value="0.5"  />
-        <param name="roi_y_min" value="0.1"  />
-        <param name="roi_y_max" value="2.0"  />
+        <param name="angle_offset_deg" value="$(arg offset)" />
+        <param name="roi_x_min"        value="-$(arg x)"     />
+        <param name="roi_x_max"        value="$(arg x)"      />
+        <param name="roi_y_min"        value="$(arg y_min)"  />
+        <param name="roi_y_max"        value="$(arg y_max)"  />
     </node>
 
     <!-- RViz: /scan_corrected 시각화 -->
