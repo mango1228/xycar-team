@@ -114,6 +114,15 @@ def get_lidar_center(pts):
     return max(0, min(WIDTH - 1, lidar_center)), bisector
 
 
+def _undo_offset(xo, yo):
+    """offset 보정을 제거해 raw 각도 기준 좌표로 복원 (laser_frame 표시용).
+    우리 시스템: x=sin(angle+offset)*r, y=cos(angle+offset)*r
+    목표:        x=sin(angle)*r,        y=cos(angle)*r  (offset 없이)"""
+    c = math.cos(-math.radians(LIDAR_ANGLE_OFFSET))
+    s = math.sin(-math.radians(LIDAR_ANGLE_OFFSET))
+    return xo * c + yo * s, yo * c - xo * s
+
+
 def publish_roi_markers(pts, scan, bisector):
     """RViz용 마커 발행: ROI 박스(초록), ROI 포인트(빨강), bisector 화살표(노랑)"""
     if scan is None:
@@ -154,7 +163,8 @@ def publish_roi_markers(pts, scan, bisector):
     pm.color.r = 1.0; pm.color.g = 0.0; pm.color.b = 0.0; pm.color.a = 1.0
     pm.lifetime = rospy.Duration(0.1)
     for x, y in pts:
-        p = GeoPoint(); p.x = x; p.y = y; p.z = 0.0
+        rx, ry = _undo_offset(x, y)
+        p = GeoPoint(); p.x = rx; p.y = ry; p.z = 0.0
         pm.points.append(p)
     arr.markers.append(pm)
 
