@@ -37,9 +37,9 @@ CANNY_LOW  = 40
 CANNY_HIGH = 100
 OFFSET     = 330     # 카메라 ROI 띠 시작 row
 GAP        = 110      # 카메라 ROI 띠 높이
-GAIN              = 0.25    # P 게인
-GAIN_I            = 0.05    # I 게인 (0이면 비활성)
-GAIN_D            = 0.05    # D 게인 (0이면 비활성)
+GAIN              = 0.2    # P 게인
+GAIN_I            = 0.0    # I 게인 (0이면 비활성)
+GAIN_D            = 0.0    # D 게인 (0이면 비활성)
 SPEED             = 5
 EMA_ALPHA         = 0.3
 ONE_LANE_RATIO    = 1.0    # 한쪽 차선만 보일 때 추종 거리 비율 (1.0=원래 반폭, <1=차선에 더 가깝게)
