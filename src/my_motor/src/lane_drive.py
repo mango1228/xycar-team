@@ -42,7 +42,7 @@ GAIN_I            = 0.01    # I 게인 (0이면 비활성)
 GAIN_D            = 0.02    # D 게인 (0이면 비활성)
 SPEED             = 5
 EMA_ALPHA         = 0.3
-ONE_LANE_RATIO    = 0.7    # 한쪽 차선만 보일 때 추종 거리 비율 (1.0=원래 반폭, <1=차선에 더 가깝게)
+ONE_LANE_RATIO    = 1.0    # 한쪽 차선만 보일 때 추종 거리 비율 (1.0=원래 반폭, <1=차선에 더 가깝게)
 SHOW_DEBUG = True
 
 if SHOW_DEBUG and not os.environ.get('DISPLAY'):
