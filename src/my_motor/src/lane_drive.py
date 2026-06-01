@@ -252,7 +252,7 @@ def process(frame):
                             minLineLength=HOUGH_MIN_LEN, maxLineGap=HOUGH_MAX_GAP)
 
     if lines is None:
-        return prev_center, "NONE", [], [], None, None, "STRAIGHT"
+        return prev_center, "NONE", [], [], None, None, "STRAIGHT", None
 
     left, right = divide_left_right(lines)
     # 여러 선분 중 무게중심이 가장 안쪽(중앙에 가까운) 1개만 채택 -> 옆 차선/노이즈 배제
@@ -264,15 +264,14 @@ def process(frame):
     lpos = get_pos(left)
     rpos = get_pos(right)
 
-    # 코너 판단: 왼쪽 차선 기울기만 사용 (이미지 좌표, 직진이어도 음수)
-    corner = "STRAIGHT"
+    # 코너 판단: 왼쪽 차선 기울기만 사용 (이미지 좌표, 직진이어도 음수). 좌회전만 판단.
+    corner   = "STRAIGHT"
+    left_slope = None
     if left:
-        lm  = float(left[0][3] - left[0][1]) / float(left[0][2] - left[0][0])
-        dev = lm - CORNER_LEFT_BASE   # 기준값 대비 편차
+        left_slope = float(left[0][3] - left[0][1]) / float(left[0][2] - left[0][0])
+        dev = left_slope - CORNER_LEFT_BASE   # 기준값 대비 편차
         if dev > CORNER_SLOPE_THRESH:
             corner = "LEFT"           # 기울기 완만(수평쪽) -> 좌회전
-        elif dev < -CORNER_SLOPE_THRESH:
-            corner = "RIGHT"          # 기울기 가파름(수직쪽) -> 우회전
 
     if lpos is not None and rpos is not None:
         center = (lpos + rpos) // 2
@@ -294,18 +293,16 @@ def process(frame):
         center = prev_center
         mode = "NONE"
 
-    # 코너 보정 (회전 방향으로 추종점 이동)
+    # 코너 보정 (좌회전 시 추종점 왼쪽으로)
     if corner == "LEFT":
         center -= CORNER_SHIFT_PX
-    elif corner == "RIGHT":
-        center += CORNER_SHIFT_PX
 
     center = max(0, min(WIDTH - 1, center))
     prev_center = center
-    return center, mode, left, right, lpos, rpos, corner
+    return center, mode, left, right, lpos, rpos, corner, left_slope
 
 
-def draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos, corner):
+def draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos, corner, left_slope):
     y = OFFSET + GAP // 2
     cv2.rectangle(frame, (0, OFFSET), (WIDTH-1, OFFSET+GAP), (0, 255, 0), 2)
     for x1, y1, x2, y2 in left:
@@ -323,8 +320,11 @@ def draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos
     cv2.circle(frame, (center, y),     8, (0, 255, 255),    2)
     cv2.circle(frame, (WIDTH//2, y),   6, (255, 255, 255), -1)
     cv2.putText(frame, mode, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+    # 왼쪽 차선 기울기 값 표시 (좌상단)
+    slope_str = "Lslope: %.2f" % left_slope if left_slope is not None else "Lslope: -"
+    cv2.putText(frame, slope_str, (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
     # 코너 판단 글씨 (화면 하단 중앙)
-    label = {"STRAIGHT": "STRAIGHT", "LEFT": "<< LEFT", "RIGHT": "RIGHT >>"}.get(corner, corner)
+    label = {"STRAIGHT": "STRAIGHT", "LEFT": "<< LEFT"}.get(corner, corner)
     color = (0, 255, 0) if corner == "STRAIGHT" else (0, 165, 255)
     cv2.putText(frame, label, (WIDTH//2 - 60, HEIGHT - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
@@ -352,7 +352,7 @@ def main():
             continue
 
         frame = image.copy()
-        center, mode, left, right, lpos, rpos, corner = process(frame)
+        center, mode, left, right, lpos, rpos, corner, left_slope = process(frame)
         cam_center = center
 
         roi_data = get_roi_data(lidar_scan)
@@ -398,7 +398,7 @@ def main():
         drive(angle, SPEED)
 
         if SHOW_DEBUG:
-            draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos, corner)
+            draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos, corner, left_slope)
 
         count += 1
         if count % 30 == 0:
