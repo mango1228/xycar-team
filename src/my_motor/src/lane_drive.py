@@ -214,6 +214,17 @@ def divide_left_right(lines):
             right.append((x1, y1, x2, y2))
     return left, right
 
+def horizon_line(lines):
+    """수평선 존재 유무 확인"""
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        if x2 == x1:
+            continue                                 # 수직선 제외
+        slope = float(y2 - y1) / float(x2 - x1)
+        if abs(slope) < 0.1:
+            if WIDTH/2 - CENTER_MARGIN < x1 < WIDTH/2 + CENTER_MARGIN and WIDTH/2 - CENTER_MARGIN < x2 < WIDTH/2 + CENTER_MARGIN:
+                return True
+    return False
 
 def get_pos(lines):
     """선분 평균 직선으로 ROI 띠 중앙(y=GAP/2)에서의 x좌표 산출. 없으면 None"""
