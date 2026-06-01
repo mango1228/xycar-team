@@ -23,14 +23,15 @@ marker_pub = None
 
 
 def get_roi_points(scan):
-    """ROI 박스 안 (x, y) 리스트 반환. 라이다 raw frame 그대로 사용."""
+    """ROI 박스 안 (x, y) 리스트 반환.
+    좌표는 표준 ROS 변환(x=cos*r, y=sin*r) — RViz가 회색 점 그리는 것과 동일."""
     pts = []
     for i, r in enumerate(scan.ranges):
         if math.isnan(r) or math.isinf(r) or r < 0.01:
             continue
         rad = scan.angle_min + i * scan.angle_increment
-        x   = math.sin(rad) * r
-        y   = math.cos(rad) * r
+        x   = math.cos(rad) * r
+        y   = math.sin(rad) * r
         if (-LIDAR_ROI_X <= x <= LIDAR_ROI_X and
                 LIDAR_ROI_Y_MIN <= y <= LIDAR_ROI_Y_MAX):
             pts.append((x, y))
