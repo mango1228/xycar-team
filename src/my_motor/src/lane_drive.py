@@ -44,9 +44,9 @@ SPEED             = 5
 EMA_ALPHA         = 0.3
 ONE_LANE_RATIO    = 1.0    # 한쪽 차선만 보일 때 추종 거리 비율 (1.0=원래 반폭, <1=차선에 더 가깝게)
 # 코너 판단/보정 (왼쪽 차선 기울기 기준)
-CORNER_LEFT_BASE  = -0.7   # 직진 시 왼쪽 차선 기울기 기준값 (실측 튜닝)
-CORNER_SLOPE_THRESH = 0.3   # 기준값에서 이만큼 벗어나면 회전으로 판단 (작을수록 민감)
-CORNER_SHIFT_PX     = 30    # 회전 시 추종점을 회전 방향으로 이동시킬 픽셀 수
+CORNER_LEFT_BASE  = -0.75  # 직진 시 왼쪽 차선 기울기 기준값 (실측: 직선 -0.75)
+CORNER_SLOPE_THRESH = 0.45  # 기준보다 이만큼 더 가팔라지면(더 음수) 좌회전 (실측: -1.2부터)
+CORNER_SHIFT_PX     = 30    # 좌회전 시 추종점을 왼쪽으로 이동시킬 픽셀 수
 SHOW_DEBUG = True
 
 if SHOW_DEBUG and not os.environ.get('DISPLAY'):
@@ -269,9 +269,9 @@ def process(frame):
     left_slope = None
     if left:
         left_slope = float(left[0][3] - left[0][1]) / float(left[0][2] - left[0][0])
-        dev = left_slope - CORNER_LEFT_BASE   # 기준값 대비 편차
-        if dev > CORNER_SLOPE_THRESH:
-            corner = "LEFT"           # 기울기 완만(수평쪽) -> 좌회전
+        dev = left_slope - CORNER_LEFT_BASE   # 기준값 대비 편차 (좌회전이면 더 음수)
+        if dev < -CORNER_SLOPE_THRESH:
+            corner = "LEFT"           # 기울기 가팔라짐(더 음수) -> 좌회전
 
     if lpos is not None and rpos is not None:
         center = (lpos + rpos) // 2
