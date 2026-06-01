@@ -115,14 +115,13 @@ class ARtag:
         rospy.Subscriber('ar_pose_marker', AlvarMarkers, self.callback, queue_size=1)
     
     def callback(self):   
-        pass
+        self.num = 0
 
-    def get_info(self, isHorizon):
-        num = 0
-        if isHorizon:
-            num += 1
+    def get_info(self):
+            self.num += 1
+            print(self.num) #debug
 
-        if num == 2:
+        if self.num == 2:
             pass
 
 # if __name__ == '__main__':

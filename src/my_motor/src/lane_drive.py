@@ -317,28 +317,7 @@ def draw_debug(frame, center, mode, left, right, cam_center, lidar_c):
     cv2.waitKey(1)
 
 
-def main():
-    global motor_pub, marker_pub
-    rospy.init_node('lane_drive')
-    motor_pub  = rospy.Publisher('xycar_motor', xycar_motor, queue_size=1)
-    marker_pub = rospy.Publisher('/lane_drive/roi_markers', MarkerArray, queue_size=1)
-    rospy.Subscriber('/usb_cam/image_raw', Image, img_callback)
-    rospy.Subscriber('/scan', LaserScan, lidar_callback, queue_size=1)
-    rospy.on_shutdown(lambda: drive(0, 0))           # 종료 시 정지 (killall 안 씀)
 
-    rospy.sleep(2.0)                                 # 카메라 준비 대기
-    print("lane_drive started")
-
-    count = 0
-    rate = rospy.Rate(30)
-    while not rospy.is_shutdown():
-        if image.size == 0:
-            rate.sleep()
-            continue
-
-        frame = image.copy()
-        center, mode, left, right = process(frame)
-        cam_center = center
 
         roi_pts         = get_lidar_roi_pts(lidar_scan)
         lidar_c, bisector = get_lidar_center(roi_pts)
