@@ -8,6 +8,7 @@
 #       라이다: lidar_only와 동일 방식 (laser_frame, cos/sin 표준 좌표)
 
 import os
+import time
 import rospy
 import numpy as np
 import cv2, math
@@ -36,7 +37,9 @@ CANNY_LOW  = 40
 CANNY_HIGH = 100
 OFFSET     = 340     # 카메라 ROI 띠 시작 row
 GAP        = 130      # 카메라 ROI 띠 높이
-GAIN              = 0.4
+GAIN              = 0.4    # P 게인
+GAIN_I            = 0.0    # I 게인 (0이면 비활성)
+GAIN_D            = 0.0    # D 게인 (0이면 비활성)
 SPEED             = 5
 EMA_ALPHA         = 0.3
 SHOW_DEBUG = True
@@ -61,6 +64,11 @@ motor_msg  = xycar_motor()
 
 ema_half_width = None
 prev_center    = WIDTH // 2
+
+# PID 상태
+prev_error = 0.0
+i_error    = 0.0
+pid_time   = None
 
 
 def img_callback(data):
@@ -332,7 +340,19 @@ def main():
                 center = lidar_c
                 mode = mode + "+LIDAR"
 
-        angle = (center - WIDTH // 2) * GAIN
+        # PID 제어
+        global prev_error, i_error, pid_time
+        now = time.time()
+        dt  = (now - pid_time) if pid_time is not None else 1e-6
+        dt  = max(dt, 1e-6)
+        pid_time = now
+
+        error   = center - WIDTH // 2
+        i_error += error * dt
+        d_out   = (error - prev_error) / dt
+        prev_error = error
+
+        angle = error * GAIN + i_error * GAIN_I + d_out * GAIN_D
         angle = max(-50, min(50, angle))
 
         drive(angle, SPEED)
