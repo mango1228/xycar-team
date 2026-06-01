@@ -46,7 +46,7 @@ ONE_LANE_RATIO    = 1.0    # 한쪽 차선만 보일 때 추종 거리 비율 (1
 # 코너 판단/보정 (왼쪽 차선 기울기 기준)
 CORNER_LEFT_BASE  = -0.75  # 직진 시 왼쪽 차선 기울기 기준값 (실측: 직선 -0.75)
 CORNER_SLOPE_THRESH = 0.45  # 기준보다 이만큼 더 가팔라지면(더 음수) 좌회전 (실측: -1.2부터)
-CORNER_SHIFT_PX     = 30    # 좌회전 시 추종점을 왼쪽으로 이동시킬 픽셀 수
+CORNER_SHIFT_PX     = 50    # 좌회전 시 추종점을 왼쪽으로 이동시킬 픽셀 수
 SHOW_DEBUG = True
 
 if SHOW_DEBUG and not os.environ.get('DISPLAY'):
