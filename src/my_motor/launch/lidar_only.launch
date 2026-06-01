@@ -1,0 +1,16 @@
+<launch>
+
+  <!-- RViz: 실행 안 하려면 rviz:=false -->
+  <arg name="rviz" default="true" />
+
+  <!-- 라이다 드라이버 -->
+  <include file="$(find xycar_lidar)/launch/lidar_noviewer.launch" />
+
+  <!-- 라이다 전용 처리 노드 (현재 단계: /scan 통계 출력) -->
+  <node name="lidar_only" output="screen" pkg="my_motor" type="lidar_only.py" />
+
+  <!-- RViz (lane_drive.rviz 설정 임시 재사용) -->
+  <node if="$(arg rviz)" name="rviz" pkg="rviz" type="rviz"
+        args="-d $(find my_motor)/rviz/lane_drive.rviz" output="screen" />
+
+</launch>
