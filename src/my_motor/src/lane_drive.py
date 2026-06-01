@@ -43,8 +43,9 @@ GAIN_D            = 0.02    # D 게인 (0이면 비활성)
 SPEED             = 5
 EMA_ALPHA         = 0.3
 ONE_LANE_RATIO    = 1.0    # 한쪽 차선만 보일 때 추종 거리 비율 (1.0=원래 반폭, <1=차선에 더 가깝게)
-# 코너 판단/보정 (양쪽 차선 보일 때만)
-CORNER_SLOPE_THRESH = 0.3   # |좌+우 기울기 합| 이 값 넘으면 회전으로 판단 (작을수록 민감)
+# 코너 판단/보정 (왼쪽 차선 기울기 기준)
+CORNER_LEFT_BASE  = -0.7   # 직진 시 왼쪽 차선 기울기 기준값 (실측 튜닝)
+CORNER_SLOPE_THRESH = 0.3   # 기준값에서 이만큼 벗어나면 회전으로 판단 (작을수록 민감)
 CORNER_SHIFT_PX     = 30    # 회전 시 추종점을 회전 방향으로 이동시킬 픽셀 수
 SHOW_DEBUG = True
 
@@ -239,7 +240,7 @@ def get_pos(lines):
 
 
 def process(frame):
-    """프레임 -> (center, mode, 좌/우 선분 리스트, lpos, rpos)"""
+    """프레임 -> (center, mode, 좌/우 선분 리스트, lpos, rpos, corner)"""
     global ema_half_width, prev_center
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -263,7 +264,16 @@ def process(frame):
     lpos = get_pos(left)
     rpos = get_pos(right)
 
+    # 코너 판단: 왼쪽 차선 기울기만 사용 (이미지 좌표, 직진이어도 음수)
     corner = "STRAIGHT"
+    if left:
+        lm  = float(left[0][3] - left[0][1]) / float(left[0][2] - left[0][0])
+        dev = lm - CORNER_LEFT_BASE   # 기준값 대비 편차
+        if dev > CORNER_SLOPE_THRESH:
+            corner = "LEFT"           # 기울기 완만(수평쪽) -> 좌회전
+        elif dev < -CORNER_SLOPE_THRESH:
+            corner = "RIGHT"          # 기울기 가파름(수직쪽) -> 우회전
+
     if lpos is not None and rpos is not None:
         center = (lpos + rpos) // 2
         half = (rpos - lpos) / 2.0
@@ -272,16 +282,6 @@ def process(frame):
         else:
             ema_half_width = EMA_ALPHA * half + (1 - EMA_ALPHA) * ema_half_width
         mode = "BOTH"
-        # 좌/우 차선 기울기 합으로 코너 판단 (이미지 좌표: 좌차선 음수, 우차선 양수)
-        lm = float(left[0][3]  - left[0][1])  / float(left[0][2]  - left[0][0])
-        rm = float(right[0][3] - right[0][1]) / float(right[0][2] - right[0][0])
-        slope_sum = lm + rm
-        if slope_sum < -CORNER_SLOPE_THRESH:
-            corner = "LEFT"
-            center -= CORNER_SHIFT_PX    # 좌회전 -> 추종점 왼쪽으로
-        elif slope_sum > CORNER_SLOPE_THRESH:
-            corner = "RIGHT"
-            center += CORNER_SHIFT_PX    # 우회전 -> 추종점 오른쪽으로
     elif lpos is not None:
         # 왼쪽만 보임 -> 기억한 반폭의 ONE_LANE_RATIO 만큼 오른쪽으로
         center = int(lpos + ema_half_width * ONE_LANE_RATIO) if ema_half_width is not None else prev_center
@@ -293,6 +293,12 @@ def process(frame):
     else:
         center = prev_center
         mode = "NONE"
+
+    # 코너 보정 (회전 방향으로 추종점 이동)
+    if corner == "LEFT":
+        center -= CORNER_SHIFT_PX
+    elif corner == "RIGHT":
+        center += CORNER_SHIFT_PX
 
     center = max(0, min(WIDTH - 1, center))
     prev_center = center
@@ -320,7 +326,7 @@ def draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos
     # 코너 판단 글씨 (화면 하단 중앙)
     label = {"STRAIGHT": "STRAIGHT", "LEFT": "<< LEFT", "RIGHT": "RIGHT >>"}.get(corner, corner)
     color = (0, 255, 0) if corner == "STRAIGHT" else (0, 165, 255)
-    cv2.putText(frame, label, (WIDTH//2 - 90, HEIGHT - 20),
+    cv2.putText(frame, label, (WIDTH//2 - 60, HEIGHT - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
     cv2.imshow('lane_drive', frame)
     cv2.waitKey(1)
