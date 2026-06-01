@@ -35,7 +35,7 @@ ROI_ANG_CENTER = (ROI_ANG_MIN + ROI_ANG_MAX) / 2.0           # ≈  -90° (차�
 
 CANNY_LOW  = 40
 CANNY_HIGH = 100
-OFFSET     = 280     # 카메라 ROI 띠 시작 row
+OFFSET     = 400     # 카메라 ROI 띠 시작 row
 GAP        = 70      # 카메라 ROI 띠 높이
 GAIN              = 0.25    # P 게인
 GAIN_I            = 0.01    # I 게인 (0이면 비활성)
