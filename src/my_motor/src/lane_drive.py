@@ -43,6 +43,9 @@ GAIN_D            = 0.02    # D 게인 (0이면 비활성)
 SPEED             = 5
 EMA_ALPHA         = 0.3
 ONE_LANE_RATIO    = 1.0    # 한쪽 차선만 보일 때 추종 거리 비율 (1.0=원래 반폭, <1=차선에 더 가깝게)
+# 코너 판단/보정 (양쪽 차선 보일 때만)
+CORNER_SLOPE_THRESH = 0.3   # |좌+우 기울기 합| 이 값 넘으면 회전으로 판단 (작을수록 민감)
+CORNER_SHIFT_PX     = 30    # 회전 시 추종점을 회전 방향으로 이동시킬 픽셀 수
 SHOW_DEBUG = True
 
 if SHOW_DEBUG and not os.environ.get('DISPLAY'):
@@ -248,7 +251,7 @@ def process(frame):
                             minLineLength=HOUGH_MIN_LEN, maxLineGap=HOUGH_MAX_GAP)
 
     if lines is None:
-        return prev_center, "NONE", [], [], None, None
+        return prev_center, "NONE", [], [], None, None, "STRAIGHT"
 
     left, right = divide_left_right(lines)
     # 여러 선분 중 무게중심이 가장 안쪽(중앙에 가까운) 1개만 채택 -> 옆 차선/노이즈 배제
@@ -260,6 +263,7 @@ def process(frame):
     lpos = get_pos(left)
     rpos = get_pos(right)
 
+    corner = "STRAIGHT"
     if lpos is not None and rpos is not None:
         center = (lpos + rpos) // 2
         half = (rpos - lpos) / 2.0
@@ -268,6 +272,16 @@ def process(frame):
         else:
             ema_half_width = EMA_ALPHA * half + (1 - EMA_ALPHA) * ema_half_width
         mode = "BOTH"
+        # 좌/우 차선 기울기 합으로 코너 판단 (이미지 좌표: 좌차선 음수, 우차선 양수)
+        lm = float(left[0][3]  - left[0][1])  / float(left[0][2]  - left[0][0])
+        rm = float(right[0][3] - right[0][1]) / float(right[0][2] - right[0][0])
+        slope_sum = lm + rm
+        if slope_sum < -CORNER_SLOPE_THRESH:
+            corner = "LEFT"
+            center -= CORNER_SHIFT_PX    # 좌회전 -> 추종점 왼쪽으로
+        elif slope_sum > CORNER_SLOPE_THRESH:
+            corner = "RIGHT"
+            center += CORNER_SHIFT_PX    # 우회전 -> 추종점 오른쪽으로
     elif lpos is not None:
         # 왼쪽만 보임 -> 기억한 반폭의 ONE_LANE_RATIO 만큼 오른쪽으로
         center = int(lpos + ema_half_width * ONE_LANE_RATIO) if ema_half_width is not None else prev_center
@@ -280,11 +294,12 @@ def process(frame):
         center = prev_center
         mode = "NONE"
 
+    center = max(0, min(WIDTH - 1, center))
     prev_center = center
-    return center, mode, left, right, lpos, rpos
+    return center, mode, left, right, lpos, rpos, corner
 
 
-def draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos):
+def draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos, corner):
     y = OFFSET + GAP // 2
     cv2.rectangle(frame, (0, OFFSET), (WIDTH-1, OFFSET+GAP), (0, 255, 0), 2)
     for x1, y1, x2, y2 in left:
@@ -302,6 +317,11 @@ def draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos
     cv2.circle(frame, (center, y),     8, (0, 255, 255),    2)
     cv2.circle(frame, (WIDTH//2, y),   6, (255, 255, 255), -1)
     cv2.putText(frame, mode, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+    # 코너 판단 글씨 (화면 하단 중앙)
+    label = {"STRAIGHT": "STRAIGHT", "LEFT": "<< LEFT", "RIGHT": "RIGHT >>"}.get(corner, corner)
+    color = (0, 255, 0) if corner == "STRAIGHT" else (0, 165, 255)
+    cv2.putText(frame, label, (WIDTH//2 - 90, HEIGHT - 20),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
     cv2.imshow('lane_drive', frame)
     cv2.waitKey(1)
 
@@ -326,7 +346,7 @@ def main():
             continue
 
         frame = image.copy()
-        center, mode, left, right, lpos, rpos = process(frame)
+        center, mode, left, right, lpos, rpos, corner = process(frame)
         cam_center = center
 
         roi_data = get_roi_data(lidar_scan)
@@ -372,7 +392,7 @@ def main():
         drive(angle, SPEED)
 
         if SHOW_DEBUG:
-            draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos)
+            draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos, corner)
 
         count += 1
         if count % 30 == 0:
