@@ -51,6 +51,7 @@ def publish_roi_markers(scan):
     box.id   = 0
     box.type = Marker.LINE_STRIP
     box.action = Marker.ADD
+    box.pose.orientation.w = 1.0   # 유효 quaternion (RViz 경고 방지)
     box.scale.x = 0.02
     box.color.r = 0.0; box.color.g = 1.0; box.color.b = 0.0; box.color.a = 1.0
     box.lifetime = rospy.Duration(0.3)
@@ -64,17 +65,20 @@ def publish_roi_markers(scan):
     arr.markers.append(box)
 
     # ── 2. ROI 안 포인트 (빨강) ────────────────────────────────────
+    roi_pts = get_roi_points(scan)
     pm = Marker()
     pm.header.stamp    = stamp
     pm.header.frame_id = frame_id
     pm.ns   = "roi"
     pm.id   = 1
+    # 박스 안 점이 없으면 DELETE (RViz가 빈 POINTS를 에러 처리하는 것 방지)
+    pm.action = Marker.ADD if roi_pts else Marker.DELETE
     pm.type = Marker.POINTS
-    pm.action = Marker.ADD
+    pm.pose.orientation.w = 1.0
     pm.scale.x = 0.05; pm.scale.y = 0.05
     pm.color.r = 1.0; pm.color.g = 0.0; pm.color.b = 0.0; pm.color.a = 1.0
     pm.lifetime = rospy.Duration(0.3)
-    for x, y in get_roi_points(scan):
+    for x, y in roi_pts:
         p = GeoPoint(); p.x = x; p.y = y; p.z = 0.0
         pm.points.append(p)
     arr.markers.append(pm)
