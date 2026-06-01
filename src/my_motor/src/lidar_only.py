@@ -3,8 +3,9 @@
 
 # lidar_only.py - 라이다 전용 처리 노드
 # 1단계: /scan 수신 + 통계 출력
-# 2단계: ROI(직사각형) 초록 박스 RViz 표시  ← 현재
-# 다음 단계에서 ROI 안 점 강조 / 제어 로직 추가 예정.
+# 2단계: ROI(직사각형) 초록 박스 RViz 표시
+# 3단계: ROI 안 포인트 빨강으로 강조  ← 현재
+# 다음 단계에서 빈 공간 방향(화살표) / 제어 로직 추가 예정.
 
 import math
 import rospy
@@ -21,12 +22,31 @@ scan_data  = None
 marker_pub = None
 
 
-def publish_roi_box(scan):
-    """ROI 박스(초록 LINE_STRIP) 마커 발행"""
+def get_roi_points(scan):
+    """ROI 박스 안 (x, y) 리스트 반환. 라이다 raw frame 그대로 사용."""
+    pts = []
+    for i, r in enumerate(scan.ranges):
+        if math.isnan(r) or math.isinf(r) or r < 0.01:
+            continue
+        rad = scan.angle_min + i * scan.angle_increment
+        x   = math.sin(rad) * r
+        y   = math.cos(rad) * r
+        if (-LIDAR_ROI_X <= x <= LIDAR_ROI_X and
+                LIDAR_ROI_Y_MIN <= y <= LIDAR_ROI_Y_MAX):
+            pts.append((x, y))
+    return pts
+
+
+def publish_roi_markers(scan):
+    """ROI 박스(초록 LINE_STRIP) + 박스 안 포인트(빨강 POINTS) 마커 발행"""
     arr = MarkerArray()
+    stamp    = scan.header.stamp
+    frame_id = scan.header.frame_id
+
+    # ── 1. ROI 박스 (초록) ─────────────────────────────────────────
     box = Marker()
-    box.header.stamp    = scan.header.stamp
-    box.header.frame_id = scan.header.frame_id
+    box.header.stamp    = stamp
+    box.header.frame_id = frame_id
     box.ns   = "roi"
     box.id   = 0
     box.type = Marker.LINE_STRIP
@@ -42,13 +62,30 @@ def publish_roi_box(scan):
         p = GeoPoint(); p.x = cx; p.y = cy; p.z = 0.0
         box.points.append(p)
     arr.markers.append(box)
+
+    # ── 2. ROI 안 포인트 (빨강) ────────────────────────────────────
+    pm = Marker()
+    pm.header.stamp    = stamp
+    pm.header.frame_id = frame_id
+    pm.ns   = "roi"
+    pm.id   = 1
+    pm.type = Marker.POINTS
+    pm.action = Marker.ADD
+    pm.scale.x = 0.05; pm.scale.y = 0.05
+    pm.color.r = 1.0; pm.color.g = 0.0; pm.color.b = 0.0; pm.color.a = 1.0
+    pm.lifetime = rospy.Duration(0.3)
+    for x, y in get_roi_points(scan):
+        p = GeoPoint(); p.x = x; p.y = y; p.z = 0.0
+        pm.points.append(p)
+    arr.markers.append(pm)
+
     marker_pub.publish(arr)
 
 
 def scan_callback(data):
     global scan_data
     scan_data = data
-    publish_roi_box(data)
+    publish_roi_markers(data)
 
 
 def main():
