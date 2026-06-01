@@ -19,13 +19,13 @@ from xycar_msgs.msg import xycar_motor
 
 # ===== 튜닝 파라미터 =====
 # LiDAR ROI 박스 (laser_frame 기준, x=cos*r, y=sin*r)
-LIDAR_ROI_X     =  0.2   # 좌우 반폭 (±m)
+LIDAR_ROI_X     =  0.3   # 좌우 반폭 (±m)
 LIDAR_ROI_Y_MIN = -0.6   # 전방 시작 (m)
-LIDAR_ROI_Y_MAX = -0.2   # 전방 끝 (m)
+LIDAR_ROI_Y_MAX = -0.1   # 전방 끝 (m)
 
 R_VIZ           = 0.7    # 빈 공간 원뿔 시각화 반경 (m)
 MIN_GAP_ANG     = 0.05   # 노이즈 무시 최소 갭 각도 (rad, ≈3°)
-LIDAR_CENTER_GAIN = -100.0  # 라이다 bisector → 픽셀 오프셋 게인
+LIDAR_CENTER_GAIN = -160.0  # 라이다 bisector → 픽셀 오프셋 게인
 
 # ROI 각도 경계 (near 모서리 기준)
 ROI_ANG_MIN    = math.atan2(LIDAR_ROI_Y_MAX, -LIDAR_ROI_X)  # ≈ -135°
