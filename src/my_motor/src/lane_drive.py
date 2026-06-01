@@ -25,7 +25,7 @@ LIDAR_ROI_Y_MAX = -0.1   # 전방 끝 (m)
 
 R_VIZ           = 0.7    # 빈 공간 원뿔 시각화 반경 (m)
 MIN_GAP_ANG     = 0.05   # 노이즈 무시 최소 갭 각도 (rad, ≈3°)
-LIDAR_CENTER_GAIN = -160.0  # 라이다 bisector → 픽셀 오프셋 게인
+LIDAR_CENTER_GAIN = -300.0  # 라이다 bisector → 픽셀 오프셋 게인
 
 # ROI 각도 경계 (near 모서리 기준)
 ROI_ANG_MIN    = math.atan2(LIDAR_ROI_Y_MAX, -LIDAR_ROI_X)  # ≈ -135°
@@ -37,7 +37,7 @@ CANNY_HIGH = 100
 OFFSET     = 340     # 카메라 ROI 띠 시작 row
 GAP        = 130      # 카메라 ROI 띠 높이
 GAIN              = 0.4
-SPEED             = 3
+SPEED             = 5
 EMA_ALPHA         = 0.3
 SHOW_DEBUG = True
 
