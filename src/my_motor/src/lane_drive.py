@@ -5,6 +5,7 @@
 # 베이스: auto_drive/hough_drive.py 구조 (ROI 먼저 자르고 Hough)
 # 개선: 튜닝 Canny / 조향 클램프+게인 / 깔끔한 종료
 #       한쪽 차선만 보일 때 -> 보이는 차선에서 중점을 직접 재구성 (반폭 EMA 사용)
+#       라이다: lidar_only와 동일 방식 (laser_frame, cos/sin 표준 좌표)
 
 import os
 import rospy
@@ -16,37 +17,40 @@ from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point as GeoPoint
 from xycar_msgs.msg import xycar_motor
 
-# ===== 튜닝 파라미터 (canny_tune으로 검증) =====
-# LiDAR ROI 튜닝값 (실측) — 직사각형 박스 (polar 내부 처리)
-LIDAR_FLIPPED      = True   # 라이다 거꾸로 장착 -> 각도 부호 반전 (좌우 보정)
-LIDAR_ANGLE_OFFSET = -4.0   # 장착 각도 보정 (도, 차량 forward 기준)
-LIDAR_ROI_X        =  0.2   # 좌우 반폭 (±m)
-LIDAR_ROI_Y_MIN    = -0.6   # 전방 시작 (m, 음수=전방)
-LIDAR_ROI_Y_MAX    = -0.2   # 전방 끝 (m)
+# ===== 튜닝 파라미터 =====
+# LiDAR ROI 박스 (laser_frame 기준, x=cos*r, y=sin*r)
+LIDAR_ROI_X     =  0.2   # 좌우 반폭 (±m)
+LIDAR_ROI_Y_MIN = -0.6   # 전방 시작 (m)
+LIDAR_ROI_Y_MAX = -0.2   # 전방 끝 (m)
 
-CANNY_LOW  = 40      # Canny 아래 임계값
-CANNY_HIGH = 100     # Canny 위 임계값
-OFFSET     = 340     # ROI 띠 시작 row
-GAP        = 40      # ROI 띠 높이
-GAIN              = 0.4    # 조향 P게인 (작을수록 둔감 -> 흔들림 적음)
-SPEED             = 5      # 주행 속도 (0~5)
-EMA_ALPHA         = 0.3    # 반폭 EMA 계수 (클수록 최신값에 민감)
-LIDAR_CENTER_GAIN = 200.0  # 라이다 중앙 추종점 변환 게인 (px/rad)
-SHOW_DEBUG = True    # 디버그 창 표시 (헤드리스 실행이면 False)
+R_VIZ           = 0.7    # 빈 공간 원뿔 시각화 반경 (m)
+MIN_GAP_ANG     = 0.05   # 노이즈 무시 최소 갭 각도 (rad, ≈3°)
+LIDAR_CENTER_GAIN = 200.0  # 라이다 bisector → 픽셀 오프셋 게인
 
-# 디스플레이 없으면 디버그 창 자동 끔 (no-display에서 cv2.imshow가 segfault 내는 것 방지)
+# ROI 각도 경계 (near 모서리 기준)
+ROI_ANG_MIN    = math.atan2(LIDAR_ROI_Y_MAX, -LIDAR_ROI_X)  # ≈ -135°
+ROI_ANG_MAX    = math.atan2(LIDAR_ROI_Y_MAX,  LIDAR_ROI_X)  # ≈  -45°
+ROI_ANG_CENTER = (ROI_ANG_MIN + ROI_ANG_MAX) / 2.0           # ≈  -90° (차량 전방)
+
+CANNY_LOW  = 40
+CANNY_HIGH = 100
+OFFSET     = 340     # 카메라 ROI 띠 시작 row
+GAP        = 40      # 카메라 ROI 띠 높이
+GAIN              = 0.4
+SPEED             = 5
+EMA_ALPHA         = 0.3
+SHOW_DEBUG = True
+
 if SHOW_DEBUG and not os.environ.get('DISPLAY'):
     print("[lane_drive] DISPLAY 없음 - 디버그 창 비활성화 (창 보려면 ssh -Y 로 접속)")
     SHOW_DEBUG = False
 
 WIDTH, HEIGHT = 640, 480
 
-# HoughLinesP 파라미터
 HOUGH_THRESHOLD = 30
 HOUGH_MIN_LEN   = 20
 HOUGH_MAX_GAP   = 10
-
-CENTER_MARGIN = 90   # 좌/우 분리 시 중앙 여유 (이 안쪽 선은 무시)
+CENTER_MARGIN   = 90
 
 image      = np.empty(shape=[0])
 lidar_scan = None
@@ -55,9 +59,8 @@ motor_pub  = None
 marker_pub = None
 motor_msg  = xycar_motor()
 
-# 한쪽 차선 처리용 상태
-ema_half_width = None        # 반(half) 차선폭의 EMA. 양쪽 차선 처음 보면 설정됨
-prev_center    = WIDTH // 2  # 직전 중점 (검출 실패 시 유지)
+ema_half_width = None
+prev_center    = WIDTH // 2
 
 
 def img_callback(data):
@@ -70,74 +73,56 @@ def lidar_callback(data):
     lidar_scan = data
 
 
-def get_lidar_roi_pts(scan):
-    """LaserScan -> ROI 박스 안의 (psi, r) 리스트.
-    psi: 차량 forward 기준 좌우 각도 (rad, 우측 양수). scan이 None이면 []."""
+def get_roi_data(scan):
+    """LaserScan -> ROI 박스 안 포인트 [(x, y, angle)] 반환.
+    laser_frame 표준 좌표 (x=cos*r, y=sin*r). scan이 None이면 []."""
     if scan is None:
         return []
-    offset_rad = math.radians(LIDAR_ANGLE_OFFSET)
-    sign = -1.0 if LIDAR_FLIPPED else 1.0
-    pts = []
+    data = []
     for i, r in enumerate(scan.ranges):
         if math.isnan(r) or math.isinf(r) or r < 0.01:
             continue
-        # 라이다 raw -> 차량 forward 기준 (forward=0, 우측+).
-        # 원래 forward 방향이 rad=π 였으므로(y=cos*r, 전방이 음수) psi = π - rad
-        raw = scan.angle_min + i * scan.angle_increment
-        psi = math.pi - (sign * raw + offset_rad)
-        psi = (psi + math.pi) % (2 * math.pi) - math.pi   # [-π, π] 정규화
-        # 박스 멤버십: 전방거리 fwd=r*cos(psi), 좌우 lat=r*sin(psi)
-        # 원래 컨벤션은 전방=음수y → y = -fwd, 비교는 -Y_MAX ≤ fwd ≤ -Y_MIN
-        fwd = r * math.cos(psi)
-        lat = r * math.sin(psi)
-        if (-LIDAR_ROI_Y_MAX <= fwd <= -LIDAR_ROI_Y_MIN and
-                abs(lat) <= LIDAR_ROI_X):
-            pts.append((psi, r))
-    return pts
+        rad = scan.angle_min + i * scan.angle_increment
+        x   = math.cos(rad) * r
+        y   = math.sin(rad) * r
+        if (-LIDAR_ROI_X <= x <= LIDAR_ROI_X and
+                LIDAR_ROI_Y_MIN <= y <= LIDAR_ROI_Y_MAX):
+            data.append((x, y, rad))
+    return data
 
 
-def get_lidar_center(pts):
-    """ROI 안 (psi, r) 리스트 -> 가장 넓은 빈 각도 구간의 중앙각
-    -> (픽셀 x, bisector_rad). 포인트 없으면 (None, None)."""
-    if not pts:
-        return None, None
-    # 박스의 최대 각도 범위 (near 모서리 기준)
-    roi_psi_max = math.atan2(LIDAR_ROI_X, -LIDAR_ROI_Y_MAX)
-    angles = sorted(p[0] for p in pts)
-
-    gaps = []
-    gaps.append((-roi_psi_max, angles[0]))
-    for i in range(len(angles) - 1):
-        gaps.append((angles[i], angles[i + 1]))
-    gaps.append((angles[-1], roi_psi_max))
-
-    largest  = max(gaps, key=lambda g: g[1] - g[0])
-    bisector = (largest[0] + largest[1]) / 2.0
-
-    lidar_center = int(WIDTH // 2 + bisector * LIDAR_CENTER_GAIN)
-    return max(0, min(WIDTH - 1, lidar_center)), bisector
+def get_gaps(data):
+    """ROI 안 포인트 각도 사이 빈 구간 [(a1, a2)] 반환.
+    포인트 없으면 ROI 전체가 하나의 빈 공간. MIN_GAP_ANG 미만은 무시."""
+    if not data:
+        return [(ROI_ANG_MIN, ROI_ANG_MAX)]
+    angles = sorted(d[2] for d in data)
+    angles = [a for a in angles if ROI_ANG_MIN <= a <= ROI_ANG_MAX]
+    if not angles:
+        return [(ROI_ANG_MIN, ROI_ANG_MAX)]
+    raw = ([(ROI_ANG_MIN, angles[0])] +
+           [(angles[i], angles[i + 1]) for i in range(len(angles) - 1)] +
+           [(angles[-1], ROI_ANG_MAX)])
+    return [(a1, a2) for a1, a2 in raw if a2 - a1 >= MIN_GAP_ANG]
 
 
-def publish_roi_markers(pts, scan, bisector):
-    """RViz용 마커 발행: ROI 박스(초록), ROI 포인트(빨강), bisector 화살표(노랑).
-    내부는 (psi, r) polar. 마커 좌표는 마지막에 xy로 변환 (forward=-y, 우측=+x)."""
+def publish_roi_markers(data, gaps, bisector, scan):
+    """RViz 마커 발행: 초록 박스 / 빨강 포인트 / 하늘색 원뿔 / 노란 화살표"""
     if scan is None:
         return
     stamp    = scan.header.stamp
     frame_id = scan.header.frame_id
     arr      = MarkerArray()
 
-    def to_xy(psi, r):
-        return r * math.sin(psi), -r * math.cos(psi)
+    def pt(x, y, z=0.0):
+        p = GeoPoint(); p.x = x; p.y = y; p.z = z; return p
 
     # ── 1. ROI 박스 (초록 LINE_STRIP) ──────────────────────────────
     box = Marker()
-    box.header.stamp    = stamp
-    box.header.frame_id = frame_id
-    box.ns   = "roi"
-    box.id   = 0
-    box.type = Marker.LINE_STRIP
+    box.header.stamp = stamp; box.header.frame_id = frame_id
+    box.ns = "roi"; box.id = 0; box.type = Marker.LINE_STRIP
     box.action = Marker.ADD
+    box.pose.orientation.w = 1.0
     box.scale.x = 0.02
     box.color.r = 0.0; box.color.g = 1.0; box.color.b = 0.0; box.color.a = 1.0
     box.lifetime = rospy.Duration(0.1)
@@ -146,45 +131,57 @@ def publish_roi_markers(pts, scan, bisector):
                    ( LIDAR_ROI_X, LIDAR_ROI_Y_MAX),
                    (-LIDAR_ROI_X, LIDAR_ROI_Y_MAX),
                    (-LIDAR_ROI_X, LIDAR_ROI_Y_MIN)]:
-        p = GeoPoint(); p.x = cx; p.y = cy; p.z = 0.0
-        box.points.append(p)
+        box.points.append(pt(cx, cy))
     arr.markers.append(box)
 
     # ── 2. ROI 안 장애물 포인트 (빨강 POINTS) ───────────────────────
     pm = Marker()
-    pm.header.stamp    = stamp
-    pm.header.frame_id = frame_id
-    pm.ns   = "roi"
-    pm.id   = 1
-    pm.type = Marker.POINTS
-    pm.action = Marker.ADD
+    pm.header.stamp = stamp; pm.header.frame_id = frame_id
+    pm.ns = "roi"; pm.id = 1; pm.type = Marker.POINTS
+    pm.action = Marker.ADD if data else Marker.DELETE
+    pm.pose.orientation.w = 1.0
     pm.scale.x = 0.05; pm.scale.y = 0.05
     pm.color.r = 1.0; pm.color.g = 0.0; pm.color.b = 0.0; pm.color.a = 1.0
     pm.lifetime = rospy.Duration(0.1)
-    for psi, r in pts:
-        x, y = to_xy(psi, r)
-        p = GeoPoint(); p.x = x; p.y = y; p.z = 0.0
-        pm.points.append(p)
+    for x, y, _ in data:
+        pm.points.append(pt(x, y))
     arr.markers.append(pm)
 
-    # ── 3. Bisector 화살표 (노랑 ARROW) ────────────────────────────
+    # ── 3. 빈 공간 원뿔 (하늘색 TRIANGLE_LIST) ──────────────────────
+    cones = Marker()
+    cones.header.stamp = stamp; cones.header.frame_id = frame_id
+    cones.ns = "roi"; cones.id = 2; cones.type = Marker.TRIANGLE_LIST
+    cones.action = Marker.ADD if gaps else Marker.DELETE
+    cones.pose.orientation.w = 1.0
+    cones.scale.x = 1.0; cones.scale.y = 1.0; cones.scale.z = 1.0
+    cones.color.r = 0.0; cones.color.g = 0.8; cones.color.b = 1.0; cones.color.a = 0.35
+    cones.lifetime = rospy.Duration(0.1)
+    origin = pt(0.0, 0.0)
+    for a1, a2 in gaps:
+        n = max(2, int((a2 - a1) / 0.05))
+        for k in range(n):
+            ang0 = a1 + (a2 - a1) * k / n
+            ang1 = a1 + (a2 - a1) * (k + 1) / n
+            p0 = pt(math.cos(ang0) * R_VIZ, math.sin(ang0) * R_VIZ)
+            p1 = pt(math.cos(ang1) * R_VIZ, math.sin(ang1) * R_VIZ)
+            cones.points.extend([origin, p0, p1])
+    arr.markers.append(cones)
+
+    # ── 4. 가장 큰 빈 공간 중심 (노란 ARROW) ────────────────────────
+    arrow = Marker()
+    arrow.header.stamp = stamp; arrow.header.frame_id = frame_id
+    arrow.ns = "roi"; arrow.id = 3; arrow.type = Marker.ARROW
+    arrow.pose.orientation.w = 1.0
+    arrow.scale.x = 0.03; arrow.scale.y = 0.07; arrow.scale.z = 0.07
+    arrow.color.r = 1.0; arrow.color.g = 1.0; arrow.color.b = 0.0; arrow.color.a = 1.0
+    arrow.lifetime = rospy.Duration(0.1)
     if bisector is not None:
-        arrow = Marker()
-        arrow.header.stamp    = stamp
-        arrow.header.frame_id = frame_id
-        arrow.ns   = "roi"
-        arrow.id   = 2
-        arrow.type = Marker.ARROW
         arrow.action = Marker.ADD
-        arrow.scale.x = 0.03; arrow.scale.y = 0.06; arrow.scale.z = 0.06
-        arrow.color.r = 1.0; arrow.color.g = 1.0; arrow.color.b = 0.0; arrow.color.a = 1.0
-        arrow.lifetime = rospy.Duration(0.1)
-        start = GeoPoint(); start.x = 0.0; start.y = 0.0; start.z = 0.0
-        L = 0.4
-        ex, ey = to_xy(bisector, L)
-        end = GeoPoint(); end.x = ex; end.y = ey; end.z = 0.0
-        arrow.points = [start, end]
-        arr.markers.append(arrow)
+        arrow.points = [origin,
+                        pt(math.cos(bisector) * 0.5, math.sin(bisector) * 0.5)]
+    else:
+        arrow.action = Marker.DELETE
+    arr.markers.append(arrow)
 
     marker_pub.publish(arr)
 
@@ -196,15 +193,14 @@ def drive(angle, speed):
 
 
 def divide_left_right(lines):
-    """Hough 선분들을 기울기/위치로 좌/우 차선으로 분리"""
     left, right = [], []
     for line in lines:
         x1, y1, x2, y2 = line[0]
         if x2 == x1:
-            continue                                 # 수직선 제외
+            continue
         slope = float(y2 - y1) / float(x2 - x1)
         if abs(slope) < 0.1 or abs(slope) > 10:
-            continue                                 # 수평/극단 기울기 제외
+            continue
         if slope < 0 and x2 < WIDTH/2 - CENTER_MARGIN:
             left.append((x1, y1, x2, y2))
         elif slope > 0 and x1 > WIDTH/2 + CENTER_MARGIN:
@@ -213,7 +209,6 @@ def divide_left_right(lines):
 
 
 def get_pos(lines):
-    """선분 평균 직선으로 ROI 띠 중앙(y=GAP/2)에서의 x좌표 산출. 없으면 None"""
     if len(lines) == 0:
         return None
     x_sum = y_sum = m_sum = 0.0
@@ -232,27 +227,25 @@ def get_pos(lines):
 
 
 def process(frame):
-    """프레임 -> (center, mode, 좌/우 선분 리스트)
-       mode: BOTH(양쪽) / LEFT(왼쪽만) / RIGHT(오른쪽만) / NONE(없음)"""
+    """프레임 -> (center, mode, 좌/우 선분 리스트, lpos, rpos)"""
     global ema_half_width, prev_center
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
     edge = cv2.Canny(blur, CANNY_LOW, CANNY_HIGH)
 
-    roi = edge[OFFSET:OFFSET+GAP, 0:WIDTH]           # ROI 먼저 -> 좌표는 띠 내부 기준
+    roi   = edge[OFFSET:OFFSET+GAP, 0:WIDTH]
     lines = cv2.HoughLinesP(roi, 1, math.pi/180, HOUGH_THRESHOLD,
                             minLineLength=HOUGH_MIN_LEN, maxLineGap=HOUGH_MAX_GAP)
 
     if lines is None:
-        return prev_center, "NONE", [], []
+        return prev_center, "NONE", [], [], None, None
 
     left, right = divide_left_right(lines)
     lpos = get_pos(left)
     rpos = get_pos(right)
 
     if lpos is not None and rpos is not None:
-        # 양쪽 다: 중점 = 가운데. 반폭(half width)을 EMA로 갱신
         center = (lpos + rpos) // 2
         half = (rpos - lpos) / 2.0
         if ema_half_width is None:
@@ -260,30 +253,18 @@ def process(frame):
         else:
             ema_half_width = EMA_ALPHA * half + (1 - EMA_ALPHA) * ema_half_width
         mode = "BOTH"
-
     elif lpos is not None:
-        # 왼쪽만 보임 -> 중점을 "왼쪽차선 + 반폭"으로 직접 계산
-        if ema_half_width is None:
-            center = prev_center                     # 아직 폭을 한 번도 못 잼
-        else:
-            center = int(lpos + ema_half_width)
+        center = int(lpos + ema_half_width) if ema_half_width is not None else prev_center
         mode = "LEFT"
-
     elif rpos is not None:
-        # 오른쪽만 보임 -> 중점을 "오른쪽차선 - 반폭"으로 직접 계산
-        if ema_half_width is None:
-            center = prev_center
-        else:
-            center = int(rpos - ema_half_width)
+        center = int(rpos - ema_half_width) if ema_half_width is not None else prev_center
         mode = "RIGHT"
-
     else:
-        # 둘 다 없음 -> 직전 중점 유지
         center = prev_center
         mode = "NONE"
 
     prev_center = center
-    return center, mode, left, right
+    return center, mode, left, right, lpos, rpos
 
 
 def draw_debug(frame, center, mode, left, right, cam_center, lidar_c):
@@ -293,11 +274,11 @@ def draw_debug(frame, center, mode, left, right, cam_center, lidar_c):
         cv2.line(frame, (x1, y1+OFFSET), (x2, y2+OFFSET), (0, 0, 255), 2)
     for x1, y1, x2, y2 in right:
         cv2.line(frame, (x1, y1+OFFSET), (x2, y2+OFFSET), (255, 0, 0), 2)
-    cv2.circle(frame, (cam_center, y), 6, (255, 128, 0),   -1)  # 카메라 중점 파랑
+    cv2.circle(frame, (cam_center, y), 6, (255, 128, 0),   -1)
     if lidar_c is not None:
-        cv2.circle(frame, (lidar_c, y), 6, (0, 0, 255),    -1)  # 라이다 중점 빨강
-    cv2.circle(frame, (center, y),     8, (0, 255, 255),    2)   # 최종 선택 중점 노랑 테두리
-    cv2.circle(frame, (WIDTH//2, y),   6, (255, 255, 255), -1)  # 화면중심 흰
+        cv2.circle(frame, (lidar_c, y), 6, (0, 0, 255),    -1)
+    cv2.circle(frame, (center, y),     8, (0, 255, 255),    2)
+    cv2.circle(frame, (WIDTH//2, y),   6, (255, 255, 255), -1)
     cv2.putText(frame, mode, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
     cv2.imshow('lane_drive', frame)
     cv2.waitKey(1)
@@ -310,9 +291,9 @@ def main():
     marker_pub = rospy.Publisher('/lane_drive/roi_markers', MarkerArray, queue_size=1)
     rospy.Subscriber('/usb_cam/image_raw', Image, img_callback)
     rospy.Subscriber('/scan', LaserScan, lidar_callback, queue_size=1)
-    rospy.on_shutdown(lambda: drive(0, 0))           # 종료 시 정지 (killall 안 씀)
+    rospy.on_shutdown(lambda: drive(0, 0))
 
-    rospy.sleep(2.0)                                 # 카메라 준비 대기
+    rospy.sleep(2.0)
     print("lane_drive started")
 
     count = 0
@@ -323,21 +304,36 @@ def main():
             continue
 
         frame = image.copy()
-        center, mode, left, right = process(frame)
+        center, mode, left, right, lpos, rpos = process(frame)
         cam_center = center
 
-        roi_pts         = get_lidar_roi_pts(lidar_scan)
-        lidar_c, bisector = get_lidar_center(roi_pts)
-        publish_roi_markers(roi_pts, lidar_scan, bisector)
+        roi_data = get_roi_data(lidar_scan)
+        gaps     = get_gaps(roi_data)
 
-        # 라이다 중앙 추종점과 비교 -> 더 중앙에서 먼 점을 사용
+        bisector = None
+        lidar_c  = None
+        if gaps:
+            largest  = max(gaps, key=lambda g: g[1] - g[0])
+            bisector = (largest[0] + largest[1]) / 2.0
+            # ROI_ANG_CENTER - bisector: laser_frame에서 car left/right 방향 보정
+            # bisector > CENTER(=-90°) → car's left → negative offset → steer left
+            dev = ROI_ANG_CENTER - bisector
+            lidar_c = max(0, min(WIDTH - 1, int(WIDTH // 2 + dev * LIDAR_CENTER_GAIN)))
+
+        publish_roi_markers(roi_data, gaps, bisector, lidar_scan)
+
         if lidar_c is not None:
+            # 차선 경계 안으로 클램프 (차선 바깥 조향 방지)
+            if lpos is not None:
+                lidar_c = max(lidar_c, lpos)
+            if rpos is not None:
+                lidar_c = min(lidar_c, rpos)
             if abs(lidar_c - WIDTH // 2) > abs(center - WIDTH // 2):
                 center = lidar_c
                 mode = mode + "+LIDAR"
 
-        angle = (center - WIDTH // 2) * GAIN         # P 제어
-        angle = max(-50, min(50, angle))             # ±50 클램프 -> 흔들림 억제
+        angle = (center - WIDTH // 2) * GAIN
+        angle = max(-50, min(50, angle))
 
         drive(angle, SPEED)
 
