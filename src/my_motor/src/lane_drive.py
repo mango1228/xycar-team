@@ -18,7 +18,8 @@ from xycar_msgs.msg import xycar_motor
 
 # ===== 튜닝 파라미터 (canny_tune으로 검증) =====
 # LiDAR ROI 튜닝값 (실측)
-LIDAR_ANGLE_OFFSET = -4.0   # 장착 각도 보정 (도)
+LIDAR_FLIPPED      = True   # 라이다 거꾸로 장착 -> 각도 부호 반전 (좌우 보정)
+LIDAR_ANGLE_OFFSET = -4.0   # 장착 각도 보정 (도, 차량 frame 기준)
 LIDAR_ROI_X        =  0.2   # 좌우 범위 (±m)
 LIDAR_ROI_Y_MIN    = -0.6   # 전방 시작 (m, 음수=전방)
 LIDAR_ROI_Y_MAX    = -0.2   # 전방 끝 (m)
@@ -74,11 +75,12 @@ def get_lidar_roi_pts(scan):
     if scan is None:
         return []
     offset_rad = math.radians(LIDAR_ANGLE_OFFSET)
+    sign = -1.0 if LIDAR_FLIPPED else 1.0
     pts = []
     for i, r in enumerate(scan.ranges):
         if math.isnan(r) or math.isinf(r) or r < 0.01:
             continue
-        rad = scan.angle_min + i * scan.angle_increment + offset_rad
+        rad = sign * (scan.angle_min + i * scan.angle_increment) + offset_rad
         x   = math.sin(rad) * r
         y   = math.cos(rad) * r   # 전방이 음수
         if (-LIDAR_ROI_X <= x <= LIDAR_ROI_X and
