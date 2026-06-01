@@ -17,12 +17,12 @@ from geometry_msgs.msg import Point as GeoPoint
 from xycar_msgs.msg import xycar_motor
 
 # ===== 튜닝 파라미터 (canny_tune으로 검증) =====
-# LiDAR ROI 튜닝값 (실측) — 부채꼴(sector) 형태
+# LiDAR ROI 튜닝값 (실측) — 직사각형 박스 (polar 내부 처리)
 LIDAR_FLIPPED      = True   # 라이다 거꾸로 장착 -> 각도 부호 반전 (좌우 보정)
 LIDAR_ANGLE_OFFSET = -4.0   # 장착 각도 보정 (도, 차량 forward 기준)
-LIDAR_ROI_HALF_ANG = 30.0   # ROI 반각 (도, 차량 forward 기준 ±)
-LIDAR_ROI_R_MIN    = 0.2    # ROI 최소 거리 (m)
-LIDAR_ROI_R_MAX    = 0.6    # ROI 최대 거리 (m)
+LIDAR_ROI_X        =  0.2   # 좌우 반폭 (±m)
+LIDAR_ROI_Y_MIN    = -0.6   # 전방 시작 (m, 음수=전방)
+LIDAR_ROI_Y_MAX    = -0.2   # 전방 끝 (m)
 
 CANNY_LOW  = 40      # Canny 아래 임계값
 CANNY_HIGH = 100     # Canny 위 임계값
@@ -71,12 +71,11 @@ def lidar_callback(data):
 
 
 def get_lidar_roi_pts(scan):
-    """LaserScan -> ROI sector 안의 (psi, r) 리스트.
+    """LaserScan -> ROI 박스 안의 (psi, r) 리스트.
     psi: 차량 forward 기준 좌우 각도 (rad, 우측 양수). scan이 None이면 []."""
     if scan is None:
         return []
     offset_rad = math.radians(LIDAR_ANGLE_OFFSET)
-    half_ang   = math.radians(LIDAR_ROI_HALF_ANG)
     sign = -1.0 if LIDAR_FLIPPED else 1.0
     pts = []
     for i, r in enumerate(scan.ranges):
@@ -87,7 +86,12 @@ def get_lidar_roi_pts(scan):
         raw = scan.angle_min + i * scan.angle_increment
         psi = math.pi - (sign * raw + offset_rad)
         psi = (psi + math.pi) % (2 * math.pi) - math.pi   # [-π, π] 정규화
-        if abs(psi) <= half_ang and LIDAR_ROI_R_MIN <= r <= LIDAR_ROI_R_MAX:
+        # 박스 멤버십: 전방거리 fwd=r*cos(psi), 좌우 lat=r*sin(psi)
+        # 원래 컨벤션은 전방=음수y → y = -fwd, 비교는 -Y_MAX ≤ fwd ≤ -Y_MIN
+        fwd = r * math.cos(psi)
+        lat = r * math.sin(psi)
+        if (-LIDAR_ROI_Y_MAX <= fwd <= -LIDAR_ROI_Y_MIN and
+                abs(lat) <= LIDAR_ROI_X):
             pts.append((psi, r))
     return pts
 
@@ -97,14 +101,15 @@ def get_lidar_center(pts):
     -> (픽셀 x, bisector_rad). 포인트 없으면 (None, None)."""
     if not pts:
         return None, None
-    half_ang = math.radians(LIDAR_ROI_HALF_ANG)
+    # 박스의 최대 각도 범위 (near 모서리 기준)
+    roi_psi_max = math.atan2(LIDAR_ROI_X, -LIDAR_ROI_Y_MAX)
     angles = sorted(p[0] for p in pts)
 
     gaps = []
-    gaps.append((-half_ang, angles[0]))
+    gaps.append((-roi_psi_max, angles[0]))
     for i in range(len(angles) - 1):
         gaps.append((angles[i], angles[i + 1]))
-    gaps.append((angles[-1], half_ang))
+    gaps.append((angles[-1], roi_psi_max))
 
     largest  = max(gaps, key=lambda g: g[1] - g[0])
     bisector = (largest[0] + largest[1]) / 2.0
@@ -114,21 +119,18 @@ def get_lidar_center(pts):
 
 
 def publish_roi_markers(pts, scan, bisector):
-    """RViz용 마커 발행: ROI sector(초록), ROI 포인트(빨강), bisector 화살표(노랑).
-    내부 좌표는 (psi, r) polar. 마커 좌표는 마지막에 xy로 변환 (forward=-y, 우측=+x)."""
+    """RViz용 마커 발행: ROI 박스(초록), ROI 포인트(빨강), bisector 화살표(노랑).
+    내부는 (psi, r) polar. 마커 좌표는 마지막에 xy로 변환 (forward=-y, 우측=+x)."""
     if scan is None:
         return
     stamp    = scan.header.stamp
     frame_id = scan.header.frame_id
     arr      = MarkerArray()
-    half_ang = math.radians(LIDAR_ROI_HALF_ANG)
-    R_MIN    = LIDAR_ROI_R_MIN
-    R_MAX    = LIDAR_ROI_R_MAX
 
     def to_xy(psi, r):
         return r * math.sin(psi), -r * math.cos(psi)
 
-    # ── 1. ROI Sector outline (초록 LINE_STRIP) ────────────────────
+    # ── 1. ROI 박스 (초록 LINE_STRIP) ──────────────────────────────
     box = Marker()
     box.header.stamp    = stamp
     box.header.frame_id = frame_id
@@ -139,23 +141,13 @@ def publish_roi_markers(pts, scan, bisector):
     box.scale.x = 0.02
     box.color.r = 0.0; box.color.g = 1.0; box.color.b = 0.0; box.color.a = 1.0
     box.lifetime = rospy.Duration(0.1)
-    n_arc = 12
-    # 안쪽 호 (왼 -> 오)
-    for k in range(n_arc + 1):
-        psi = -half_ang + (2 * half_ang) * k / n_arc
-        x, y = to_xy(psi, R_MIN)
-        p = GeoPoint(); p.x = x; p.y = y; p.z = 0.0
+    for cx, cy in [(-LIDAR_ROI_X, LIDAR_ROI_Y_MIN),
+                   ( LIDAR_ROI_X, LIDAR_ROI_Y_MIN),
+                   ( LIDAR_ROI_X, LIDAR_ROI_Y_MAX),
+                   (-LIDAR_ROI_X, LIDAR_ROI_Y_MAX),
+                   (-LIDAR_ROI_X, LIDAR_ROI_Y_MIN)]:
+        p = GeoPoint(); p.x = cx; p.y = cy; p.z = 0.0
         box.points.append(p)
-    # 바깥쪽 호 (오 -> 왼)
-    for k in range(n_arc + 1):
-        psi = half_ang - (2 * half_ang) * k / n_arc
-        x, y = to_xy(psi, R_MAX)
-        p = GeoPoint(); p.x = x; p.y = y; p.z = 0.0
-        box.points.append(p)
-    # 닫기
-    x, y = to_xy(-half_ang, R_MIN)
-    p = GeoPoint(); p.x = x; p.y = y; p.z = 0.0
-    box.points.append(p)
     arr.markers.append(box)
 
     # ── 2. ROI 안 장애물 포인트 (빨강 POINTS) ───────────────────────
