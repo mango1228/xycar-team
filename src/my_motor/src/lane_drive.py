@@ -251,6 +251,12 @@ def process(frame):
         return prev_center, "NONE", [], [], None, None
 
     left, right = divide_left_right(lines)
+    # 여러 선분 중 무게중심이 가장 안쪽(중앙에 가까운) 1개만 채택 -> 옆 차선/노이즈 배제
+    mid = lambda l: (l[0] + l[2]) / 2.0
+    if left:
+        left = [max(left, key=mid)]    # 왼쪽: 무게중심이 가장 오른쪽인 선분
+    if right:
+        right = [min(right, key=mid)]  # 오른쪽: 무게중심이 가장 왼쪽인 선분
     lpos = get_pos(left)
     rpos = get_pos(right)
 
