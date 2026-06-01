@@ -21,7 +21,7 @@ from xycar_msgs.msg import xycar_motor
 # ===== 튜닝 파라미터 =====
 # LiDAR ROI 박스 (laser_frame 기준, x=cos*r, y=sin*r)
 LIDAR_ROI_X     =  0.33   # 좌우 반폭 (±m)
-LIDAR_ROI_Y_MIN = -0.55   # 전방 시작 (m)
+LIDAR_ROI_Y_MIN = -0.45   # 전방 시작 (m)
 LIDAR_ROI_Y_MAX = -0.05   # 전방 끝 (m)
 
 R_VIZ           = 0.7    # 빈 공간 원뿔 시각화 반경 (m)
@@ -39,7 +39,7 @@ OFFSET     = 330     # 카메라 ROI 띠 시작 row
 GAP        = 110      # 카메라 ROI 띠 높이
 GAIN              = 0.3    # P 게인
 GAIN_I            = 0.0    # I 게인 (0이면 비활성)
-GAIN_D            = 0.0    # D 게인 (0이면 비활성)
+GAIN_D            = 0.03    # D 게인 (0이면 비활성)
 SPEED             = 5
 EMA_ALPHA         = 0.3
 ONE_LANE_RATIO    = 1.0    # 한쪽 차선만 보일 때 추종 거리 비율 (1.0=원래 반폭, <1=차선에 더 가깝게)
