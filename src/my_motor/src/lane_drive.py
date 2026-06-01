@@ -278,13 +278,18 @@ def process(frame):
     return center, mode, left, right, lpos, rpos
 
 
-def draw_debug(frame, center, mode, left, right, cam_center, lidar_c):
+def draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos):
     y = OFFSET + GAP // 2
     cv2.rectangle(frame, (0, OFFSET), (WIDTH-1, OFFSET+GAP), (0, 255, 0), 2)
     for x1, y1, x2, y2 in left:
         cv2.line(frame, (x1, y1+OFFSET), (x2, y2+OFFSET), (0, 0, 255), 2)
     for x1, y1, x2, y2 in right:
         cv2.line(frame, (x1, y1+OFFSET), (x2, y2+OFFSET), (255, 0, 0), 2)
+    # 차선 검출 위치 (get_pos 반환값) 검정 점
+    if lpos is not None:
+        cv2.circle(frame, (lpos, y), 6, (0, 0, 0), -1)
+    if rpos is not None:
+        cv2.circle(frame, (rpos, y), 6, (0, 0, 0), -1)
     cv2.circle(frame, (cam_center, y), 6, (255, 128, 0),   -1)
     if lidar_c is not None:
         cv2.circle(frame, (lidar_c, y), 6, (0, 0, 255),    -1)
@@ -361,7 +366,7 @@ def main():
         drive(angle, SPEED)
 
         if SHOW_DEBUG:
-            draw_debug(frame, center, mode, left, right, cam_center, lidar_c)
+            draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos)
 
         count += 1
         if count % 30 == 0:
