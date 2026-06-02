@@ -24,7 +24,41 @@
   <include file="$(find xycar_lidar)/launch/lidar_noviewer.launch" />
 
   <!-- 차선주행 노드 -->
-  <node name="lane_drive" output="screen" pkg="my_motor" type="lane_drive.py" />
+  <node name="lane_drive" pkg="my_motor" type="main.py" output="screen">
+    <param name="lidar_roi_x" value="0.33" />
+    <param name="lidar_roi_y_min" value="-0.45" />
+    <param name="lidar_roi_y_max" value="-0.05" />
+
+    <param name="r_viz" value="0.7" />
+
+    <param name="min_gap_ang" value="0.05" />
+
+    <param name="lidar_center_gain" value="-170.0" />
+
+    <param name="canny_low" value="40" />
+    <param name="canny_high" value="100" />
+    <param name="offset" value="330" />
+    <param name="gap" value="110" />
+
+    <param name="gain" value="0.25" />
+    <param name="gain_i" value="0.01" />
+    <param name="gain_d" value="0.01" />
+
+    <param name="speed" value="5.0" />
+    <param name="ema_alpha" value="0.3" />
+    <param name="one_lane_ratio" value="1.0" />
+    <param name="corner_left_base" value="-0.75" />
+    <param name="corner_slope_thresh" value="0.4" />
+    <param name="corner_shift_px" value="70" />
+
+    <param name="hough_threshold" value="30" />
+    <param name="hough_min_len" value="20" />
+    <param name="hough_max_gap" value="10" />
+
+    <param name="center_margin" value="90" />
+
+    <param name="show_debug" value="true"/>
+  </node>
 
   <!-- RViz (rviz:=false 로 끌 수 있음) -->
   <node if="$(arg rviz)" name="rviz" pkg="rviz" type="rviz"
