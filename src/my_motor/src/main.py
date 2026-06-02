@@ -26,7 +26,7 @@ class XycarController:
         self.lidar_processor = LidarProcessor(self.cfg)
         self.xycar_driver = XycarDriver()
 
-        rospy.on_shutdown(self.shutdown)  # 안전 정지
+        rospy.on_shutdown(self.shutdown())  # 안전 정지
 
         self.rate = rospy.Rate(30)
 

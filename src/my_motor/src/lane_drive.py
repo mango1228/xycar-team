@@ -16,62 +16,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point as GeoPoint
 from xycar_msgs.msg import xycar_motor
 
-# # ===== 튜닝 파라미터 =====
-# # LiDAR ROI 박스 (laser_frame 기준, x=cos*r, y=sin*r)
-# LIDAR_ROI_X     =  0.33   # 좌우 반폭 (±m)
-# LIDAR_ROI_Y_MIN = -0.45   # 전방 시작 (m)
-# LIDAR_ROI_Y_MAX = -0.05   # 전방 끝 (m)
 
-# R_VIZ           = 0.7    # 빈 공간 원뿔 시각화 반경 (m)
-# MIN_GAP_ANG     = 0.05   # 노이즈 무시 최소 갭 각도 (rad, ≈3°)
-# LIDAR_CENTER_GAIN = -170.0  # 라이다 bisector → 픽셀 오프셋 게인
-
-# # ROI 각도 경계 (near 모서리 기준)
-# ROI_ANG_MIN    = math.atan2(LIDAR_ROI_Y_MAX, -LIDAR_ROI_X)  # ≈ -135°
-# ROI_ANG_MAX    = math.atan2(LIDAR_ROI_Y_MAX,  LIDAR_ROI_X)  # ≈  -45°
-# ROI_ANG_CENTER = (ROI_ANG_MIN + ROI_ANG_MAX) / 2.0           # ≈  -90° (차량 전방)
-
-# CANNY_LOW  = 40
-# CANNY_HIGH = 100
-# OFFSET     = 330     # 카메라 ROI 띠 시작 row
-# GAP        = 110      # 카메라 ROI 띠 높이
-# GAIN              = 0.25    # P 게인
-# GAIN_I            = 0.01    # I 게인 (0이면 비활성)
-# GAIN_D            = 0.01   # D 게인 (0이면 비활성)
-# SPEED             = 5
-# EMA_ALPHA         = 0.3
-# ONE_LANE_RATIO    = 1.0    # 한쪽 차선만 보일 때 추종 거리 비율 (1.0=원래 반폭, <1=차선에 더 가깝게)
-# # 코너 판단/보정 (왼쪽 차선 기울기 기준)
-# CORNER_LEFT_BASE  = -0.75  # 직진 시 왼쪽 차선 기울기 기준값 (실측: 직선 -0.75)
-# CORNER_SLOPE_THRESH = 0.4  # 기준보다 이만큼 더 가팔라지면(더 음수) 좌회전 (실측: -1.2부터)
-# CORNER_SHIFT_PX     = 70    # 좌회전 시 추종점을 왼쪽으로 이동시킬 픽셀 수
-# SHOW_DEBUG = True
-
-# if SHOW_DEBUG and not os.environ.get('DISPLAY'):
-#     print("[lane_drive] DISPLAY 없음 - 디버그 창 비활성화 (창 보려면 ssh -Y 로 접속)")
-#     SHOW_DEBUG = False
-
-# WIDTH, HEIGHT = 640, 480
-
-# HOUGH_THRESHOLD = 30
-# HOUGH_MIN_LEN   = 20
-# HOUGH_MAX_GAP   = 10
-# CENTER_MARGIN   = 90
-
-# change it into self with class
-# image      = np.empty(shape=[0])
-# lidar_scan = None
-# bridge     = CvBridge()
-# motor_pub  = None
-# marker_pub = None
-# motor_msg  = xycar_motor()
-
-
-
-# # PID 상태
-# prev_error = 0.0
-# i_error    = 0.0
-# pid_time   = None
 
 class ImageProcessor:
     def __init__ (self, cfg):
@@ -82,7 +27,6 @@ class ImageProcessor:
         self.prev_center= self.cfg.width // 2
 
         rospy.Subscriber('/usb_cam/image_raw', Image, self.img_callback)
-
         
     def img_callback(self, data):
         self.image = self.bridge.imgmsg_to_cv2(data, "bgr8")
