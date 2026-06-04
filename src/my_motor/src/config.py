@@ -51,8 +51,8 @@ class Config:
         self.i_clamp = rospy.get_param("~i_clamp", 300.0)
 
         # 감지 ROI (화면 하단 중앙). int() 보장: 슬라이스 인덱스/ cv2 좌표로 쓰여 float면 크래시
-        self.detect_roi_top    = int(rospy.get_param("~detect_roi_top", 250))
-        self.detect_roi_bottom = int(rospy.get_param("~detect_roi_bottom", 400))
+        self.detect_roi_top    = int(rospy.get_param("~detect_roi_top", 300))
+        self.detect_roi_bottom = int(rospy.get_param("~detect_roi_bottom", 450))
         self.detect_roi_left   = int(rospy.get_param("~detect_roi_left", 220))
         self.detect_roi_right  = int(rospy.get_param("~detect_roi_right", 420))
 
@@ -79,7 +79,7 @@ class Config:
 
         # 판정: 흰 비율 >= classify_white_pct 면 내부 선분 평균각(0도=수평,90도=수직)으로 구분
         #       평균각 >= classify_angle_deg → 횡단보도(세로) / < → 빗금(사선)
-        self.classify_white_pct  = rospy.get_param("~classify_white_pct", 10.0)
+        self.classify_white_pct  = rospy.get_param("~classify_white_pct", 15.0)
         self.classify_angle_deg  = rospy.get_param("~classify_angle_deg", 60.0)
         # 이 각도(도) 미만의 거의 수평인 선분은 평균각 계산에서 제외 (노이즈 무시)
         self.stripe_min_angle_deg = rospy.get_param("~stripe_min_angle_deg", 10.0)

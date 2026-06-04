@@ -88,8 +88,8 @@
     <param name="detect_hz" value="15.0" />
     <param name="show_debug" value="true" />
 
-    <param name="detect_roi_top" value="250" />
-    <param name="detect_roi_bottom" value="400" />
+    <param name="detect_roi_top" value="300" />
+    <param name="detect_roi_bottom" value="450" />
     <param name="detect_roi_left" value="220" />
     <param name="detect_roi_right" value="420" />
 
@@ -100,7 +100,7 @@
 
     <!-- 판정: 흰 비율 >= 7% 면 선분 평균각으로 구분 (0도=수평,90도=수직)
          평균각 >= 60도 → 횡단보도(세로) / < → 빗금(사선) -->
-    <param name="classify_white_pct" value="10.0" />
+    <param name="classify_white_pct" value="15.0" />
     <param name="classify_angle_deg" value="60.0" />
     <param name="stripe_min_angle_deg" value="10.0" />
     <param name="stripe_hough_threshold" value="15" />
