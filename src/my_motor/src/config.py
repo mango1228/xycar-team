@@ -79,7 +79,7 @@ class Config:
 
         # 판정: 흰 비율 >= classify_white_pct 면 내부 선분 평균각(0도=수평,90도=수직)으로 구분
         #       평균각 >= classify_angle_deg → 횡단보도(세로) / < → 빗금(사선)
-        self.classify_white_pct  = rospy.get_param("~classify_white_pct", 5.0)
+        self.classify_white_pct  = rospy.get_param("~classify_white_pct", 10.0)
         self.classify_angle_deg  = rospy.get_param("~classify_angle_deg", 60.0)
         # 이 각도(도) 미만의 거의 수평인 선분은 평균각 계산에서 제외 (노이즈 무시)
         self.stripe_min_angle_deg = rospy.get_param("~stripe_min_angle_deg", 10.0)
