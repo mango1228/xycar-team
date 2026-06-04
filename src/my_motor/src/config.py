@@ -50,11 +50,11 @@ class Config:
         # PID 적분 와인드업 클램프 (±)
         self.i_clamp = rospy.get_param("~i_clamp", 300.0)
 
-        # 감지 ROI (화면 하단 중앙)
-        self.detect_roi_top    = rospy.get_param("~detect_roi_top", 250)
-        self.detect_roi_bottom = rospy.get_param("~detect_roi_bottom", 460)
-        self.detect_roi_left   = rospy.get_param("~detect_roi_left", 40)
-        self.detect_roi_right  = rospy.get_param("~detect_roi_right", 600)
+        # 감지 ROI (화면 하단 중앙). int() 보장: 슬라이스 인덱스/ cv2 좌표로 쓰여 float면 크래시
+        self.detect_roi_top    = int(rospy.get_param("~detect_roi_top", 250))
+        self.detect_roi_bottom = int(rospy.get_param("~detect_roi_bottom", 460))
+        self.detect_roi_left   = int(rospy.get_param("~detect_roi_left", 40))
+        self.detect_roi_right  = int(rospy.get_param("~detect_roi_right", 600))
 
         # 횡단보도 감지
         self.cross_white_thresh   = rospy.get_param("~cross_white_thresh", 180)
@@ -77,6 +77,8 @@ class Config:
         self.hatch_white_pct       = rospy.get_param("~hatch_white_pct", 4.0)
         self.hatch_confirm_frames  = rospy.get_param("~hatch_confirm_frames", 2)
         self.hatch_delay_sec       = rospy.get_param("~hatch_delay_sec", 1.0)
+        # 빗금 확정 카운터가 견딜 연속 미검출 수(검출 패스 단위). 깜빡임에 정지가 리셋되는 것 방지
+        self.hatch_miss_tolerance  = int(rospy.get_param("~hatch_miss_tolerance", 3))
 
         # 시작 직후 오탐 방지 유예 시간(초)
         self.startup_grace_sec = rospy.get_param("~startup_grace_sec", 3.0)

@@ -4,6 +4,8 @@
   <arg name="exposure" default="110" />
   <!-- RViz: 실행 안 하려면 rviz:=false -->
   <arg name="rviz" default="true" />
+  <!-- 특수구역(횡단보도/빗금) 정지: 기본 켜짐. 끄려면 special_zone:=false -->
+  <arg name="special_zone" default="true" />
 
   <!-- 모터 드라이버 -->
   <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
@@ -59,8 +61,8 @@
 
     <param name="show_debug" value="true"/>
 
-    <!-- 특수구역(횡단보도/빗금) 정지: 이 런치에서는 비활성(false). 켜려면 special_zone_drive.launch 사용 -->
-    <param name="enable_special_zone" value="false" />
+    <!-- 특수구역(횡단보도/빗금) 정지: special_zone:=false 로 끌 수 있음 -->
+    <param name="enable_special_zone" value="$(arg special_zone)" />
     <param name="detect_every" value="1" />
     <param name="i_clamp" value="300.0" />
 
@@ -88,6 +90,7 @@
     <param name="hatch_white_pct" value="4.0" />
     <param name="hatch_confirm_frames" value="2" />
     <param name="hatch_delay_sec" value="1.0" />
+    <param name="hatch_miss_tolerance" value="3" />
 
     <param name="startup_grace_sec" value="3.0" />
     <param name="post_resume_grace_sec" value="3.0" />

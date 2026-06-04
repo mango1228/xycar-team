@@ -43,6 +43,7 @@ class XycarController:
         self.hatch_first_detected_time = None
         self.cross_consecutive         = 0
         self.hatch_consecutive         = 0
+        self.hatch_miss                = 0      # 빗금 연속 미검출 카운트 (miss tolerance용)
         self.node_start_time           = None   # run()에서 워밍업 후 설정
 
         # 검사 결과 캐시 (detect_every>1 일 때 검사 안 한 프레임에서 오버레이용으로 재사용)
@@ -141,12 +142,17 @@ class XycarController:
                     if cross_active:
                         self.cross_consecutive += 1
                         self.hatch_consecutive  = 0
+                        self.hatch_miss         = 0
                     else:
                         self.cross_consecutive = 0
                         if hatch_detected and not in_grace:
                             self.hatch_consecutive += 1
+                            self.hatch_miss = 0
                         else:
-                            self.hatch_consecutive = 0
+                            # 연속 미검출이 tolerance를 넘어야만 카운터 리셋(깜빡임 흡수)
+                            self.hatch_miss += 1
+                            if self.hatch_miss >= self.cfg.hatch_miss_tolerance:
+                                self.hatch_consecutive = 0
 
                 # 상태 실행/주행/정지타이머/하치딜레이는 캐시 카운터로 매 프레임(30Hz) 동작
                 if self.drive_state == self.STATE_HATCH_STOP:
