@@ -12,8 +12,10 @@ from lane_drive import ImageProcessor, LidarProcessor, XycarDriver
 class XycarController:
     # 주행 상태
     STATE_DRIVE          = "DRIVE"
-    STATE_CROSSWALK_STOP = "CROSSWALK_STOP"
-    STATE_HATCH_STOP     = "HATCH_STOP"
+    STATE_CROSSWALK_STOP = "CROSSWALK_STOP"   # 횡단보도 정지(검증). 10초 유지=진짜 / 사라지면 오탐 복귀
+    STATE_HATCH_VERIFY   = "HATCH_VERIFY"     # 빗금 정지 검증. 1초 유지=진짜 / 사라지면 오탐 복귀
+    STATE_HATCH_ADVANCE  = "HATCH_ADVANCE"    # 빗금 확정 후 1초 전진
+    STATE_HATCH_STOP     = "HATCH_STOP"       # 영구 정지
 
     def __init__(self):
         rospy.init_node('lane_drive')
@@ -35,15 +37,19 @@ class XycarController:
         self.xycar_driver = XycarDriver()
 
         # 특수구역 상태머신 상태 (컨트롤러 소유)
-        self.drive_state               = self.STATE_DRIVE
-        self.stop_start_time           = None
-        self.cross_cooldown_until      = 0.0
-        self.resume_grace_until        = 0.0    # 횡단보도 재출발 직후 감지 유예 마감 시각
-        self.hatch_first_detected_time = None
-        self.cross_consecutive         = 0
-        self.hatch_consecutive         = 0
-        self.hatch_miss                = 0      # 빗금 연속 미검출 카운트 (miss tolerance용)
-        self.node_start_time           = None   # run()에서 워밍업 후 설정
+        self.drive_state         = self.STATE_DRIVE
+        self.stop_start_time     = None         # 횡단보도 정지 시작 시각
+        self.hatch_verify_start  = None         # 빗금 검증 시작 시각
+        self.advance_start       = None         # 빗금 전진 시작 시각
+        self.resume_grace_until  = 0.0          # 횡단보도 성공 후 둘 다 무시하는 유예 마감 시각
+        self.last_cross_seen     = 0.0          # 횡단보도가 마지막으로 검출된 시각
+        self.last_hatch_seen     = 0.0          # 빗금이 마지막으로 검출된 시각
+        self.cross_now           = False        # 최신 메시지의 횡단보도 검출값
+        self.hatch_now           = False        # 최신 메시지의 빗금 검출값
+        self.cross_consecutive   = 0
+        self.hatch_consecutive   = 0
+        self.hatch_miss          = 0            # 빗금 연속 미검출 카운트 (miss tolerance용)
+        self.node_start_time     = None         # run()에서 워밍업 후 설정
 
         # /special_zone 구독: 검출은 별도 노드(special_zone_detector)가 담당.
         # 콜백은 최신값만 저장(가벼움), 카운터 갱신은 메인 루프가 메시지 단위로 처리.
@@ -62,12 +68,18 @@ class XycarController:
 
     def compute_pid_angle(self, center):
         """center -> PID 조향각. 적분 와인드업 클램프 포함."""
-        now = time.time()
-        dt  = (now - self.pid_time) if self.pid_time is not None else 1e-6
-        dt  = max(dt, 1e-6)
+        now   = time.time()
+        error = center - self.cfg.width // 2
+
+        if self.pid_time is None:
+            # 첫 프레임/reset 직후: 미분 기준이 없음 → D 스킵, P만 (조향 튐 방지)
+            self.pid_time   = now
+            self.prev_error = error
+            return max(-50, min(50, error * self.cfg.gain))
+
+        dt = max(now - self.pid_time, 1e-6)
         self.pid_time = now
 
-        error = center - self.cfg.width // 2
         self.i_error += error * dt
         self.i_error = float(np.clip(self.i_error, -self.cfg.i_clamp, self.cfg.i_clamp))  # 와인드업 방지
         d_out = (error - self.prev_error) / dt
@@ -124,8 +136,6 @@ class XycarController:
                     mode = mode + "+LIDAR"
 
             now = time.time()
-            stop_remain        = 0.0
-            hatch_delay_remain = 0.0
 
             if not self.cfg.enable_special_zone:
                 # ===== 기존 차선주행 경로 (특수구역 off) =====
@@ -133,24 +143,26 @@ class XycarController:
                 self.xycar_driver.drive(angle, self.cfg.speed)
             else:
                 # ===== 특수구역 정지 경로 =====
-                # 검출은 별도 노드가 /special_zone 으로 보냄. confirm 카운터는 메시지 단위로
-                # 갱신(디바운스 = '검출 패스' 단위 유지). 메인 루프 속도와 분리됨.
+                # 검출은 별도 노드가 /special_zone 으로 보냄. 메시지 단위로 카운터/최근검출시각 갱신.
                 if self.sz_new:
                     self.sz_new = False
-                    cross_detected = bool(self.sz_raw & 1)
-                    hatch_detected = bool(self.sz_raw & 2)
+                    self.cross_now = bool(self.sz_raw & 1)
+                    self.hatch_now = bool(self.sz_raw & 2)
+                    if self.cross_now:
+                        self.last_cross_seen = now
+                    if self.hatch_now:
+                        self.last_hatch_seen = now
 
-                    # 유예: 시작 직후(startup_grace) 또는 횡단보도 재출발 직후(resume_grace)
+                    # 유예: 시작 직후(startup_grace) 또는 횡단보도 성공 후(resume_grace) → 둘 다 무시
                     in_grace = ((now - self.node_start_time) < self.cfg.startup_grace_sec
                                 or now < self.resume_grace_until)
-                    cross_active = cross_detected and now > self.cross_cooldown_until and not in_grace
-                    if cross_active:
+                    if self.cross_now and not in_grace:
                         self.cross_consecutive += 1
                         self.hatch_consecutive  = 0
                         self.hatch_miss         = 0
                     else:
                         self.cross_consecutive = 0
-                        if hatch_detected and not in_grace:
+                        if self.hatch_now and not in_grace:
                             self.hatch_consecutive += 1
                             self.hatch_miss = 0
                         else:
@@ -159,48 +171,64 @@ class XycarController:
                             if self.hatch_miss >= self.cfg.hatch_miss_tolerance:
                                 self.hatch_consecutive = 0
 
-                # 상태 실행/주행/정지타이머/하치딜레이는 캐시 카운터로 매 프레임(30Hz) 동작
+                # 상태머신은 매 프레임(30Hz) 동작
                 if self.drive_state == self.STATE_HATCH_STOP:
+                    self.xycar_driver.drive(0, 0)                       # 영구 정지
+
+                elif self.drive_state == self.STATE_HATCH_ADVANCE:
+                    # 빗금 확정 후 차선 따라 전진 → 시간 다 되면 영구 정지
+                    if now - self.advance_start >= self.cfg.hatch_advance_sec:
+                        rospy.loginfo("[special_zone] 빗금 전진 완료 -> 영구 정지")
+                        self.drive_state = self.STATE_HATCH_STOP
+                        self.xycar_driver.drive(0, 0)
+                    else:
+                        angle = self.compute_pid_angle(center)
+                        self.xycar_driver.drive(angle, self.cfg.speed)
+
+                elif self.drive_state == self.STATE_HATCH_VERIFY:
+                    # 멈춘 채 빗금 검증: 1초 유지=진짜 / 사라지면 오탐 복귀
                     self.xycar_driver.drive(0, 0)
+                    if now - self.last_hatch_seen > self.cfg.hatch_lost_sec:
+                        rospy.loginfo("[special_zone] 빗금 사라짐(오탐) -> 재출발")
+                        self.reset_pid()
+                        self.drive_state = self.STATE_DRIVE
+                    elif now - self.hatch_verify_start >= self.cfg.hatch_verify_sec:
+                        rospy.loginfo("[special_zone] 빗금 확정 -> %.1f초 전진" % self.cfg.hatch_advance_sec)
+                        self.reset_pid()
+                        self.advance_start = now
+                        self.drive_state   = self.STATE_HATCH_ADVANCE
 
                 elif self.drive_state == self.STATE_CROSSWALK_STOP:
+                    # 정지 중 검증: 10초 유지=진짜 / 사라지면 오탐 즉시 복귀
                     self.xycar_driver.drive(0, 0)
-                    elapsed     = now - self.stop_start_time
-                    stop_remain = max(0.0, self.cfg.crosswalk_stop_sec - elapsed)
-                    if elapsed >= self.cfg.crosswalk_stop_sec:
-                        rospy.loginfo("[special_zone] 횡단보도 정지 완료 -> 재출발")
-                        self.cross_cooldown_until = now + self.cfg.cross_cooldown_sec
-                        # 재출발 직후 유예: 차가 횡단보도를 지나기 전 빗금 오발동(영구정지) 방지
+                    if now - self.last_cross_seen > self.cfg.cross_lost_sec:
+                        rospy.loginfo("[special_zone] 횡단보도 아님(오탐) -> 재출발")
+                        self.reset_pid()
+                        self.drive_state = self.STATE_DRIVE
+                    elif now - self.stop_start_time >= self.cfg.crosswalk_stop_sec:
+                        rospy.loginfo("[special_zone] 횡단보도 10초 정지 완료 -> 재출발(+%.1f초 유예)" % self.cfg.post_resume_grace_sec)
                         self.resume_grace_until = now + self.cfg.post_resume_grace_sec
                         self.reset_pid()
                         self.drive_state = self.STATE_DRIVE
 
                 else:  # STATE_DRIVE
                     if self.cross_consecutive >= self.cfg.cross_confirm_frames:
-                        rospy.loginfo("[special_zone] 횡단보도 감지 -> %.1f초 정지" % self.cfg.crosswalk_stop_sec)
-                        self.drive_state               = self.STATE_CROSSWALK_STOP
-                        self.stop_start_time           = now
-                        self.hatch_first_detected_time = None
+                        rospy.loginfo("[special_zone] 횡단보도 감지 -> 정지(검증)")
+                        self.drive_state     = self.STATE_CROSSWALK_STOP
+                        self.stop_start_time = now
+                        self.last_cross_seen = now
                         self.reset_pid()
                         self.xycar_driver.drive(0, 0)
 
                     elif self.hatch_consecutive >= self.cfg.hatch_confirm_frames:
-                        if self.hatch_first_detected_time is None:
-                            self.hatch_first_detected_time = now
-                            rospy.loginfo("[special_zone] 빗금 확정 -> %.1f초 후 정지" % self.cfg.hatch_delay_sec)
-                        elapsed_hatch = now - self.hatch_first_detected_time
-                        if elapsed_hatch >= self.cfg.hatch_delay_sec:
-                            rospy.loginfo("[special_zone] 빗금 구역 -> 영구 정지")
-                            self.drive_state = self.STATE_HATCH_STOP
-                            self.reset_pid()
-                            self.xycar_driver.drive(0, 0)
-                        else:
-                            hatch_delay_remain = self.cfg.hatch_delay_sec - elapsed_hatch
-                            angle = self.compute_pid_angle(center)
-                            self.xycar_driver.drive(angle, self.cfg.speed)
+                        rospy.loginfo("[special_zone] 빗금 감지 -> 정지(검증)")
+                        self.drive_state        = self.STATE_HATCH_VERIFY
+                        self.hatch_verify_start = now
+                        self.last_hatch_seen    = now
+                        self.reset_pid()
+                        self.xycar_driver.drive(0, 0)
 
                     else:
-                        self.hatch_first_detected_time = None
                         angle = self.compute_pid_angle(center)
                         self.xycar_driver.drive(angle, self.cfg.speed)
 

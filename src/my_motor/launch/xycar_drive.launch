@@ -68,14 +68,16 @@
 
     <param name="cross_confirm_frames" value="1" />
     <param name="crosswalk_stop_sec" value="10.0" />
-    <param name="cross_cooldown_sec" value="15.0" />
+    <param name="cross_lost_sec" value="0.5" />
 
     <param name="hatch_confirm_frames" value="2" />
-    <param name="hatch_delay_sec" value="1.0" />
+    <param name="hatch_verify_sec" value="1.0" />
+    <param name="hatch_lost_sec" value="0.3" />
+    <param name="hatch_advance_sec" value="1.0" />
     <param name="hatch_miss_tolerance" value="3" />
 
     <param name="startup_grace_sec" value="3.0" />
-    <param name="post_resume_grace_sec" value="3.0" />
+    <param name="post_resume_grace_sec" value="5.0" />
   </node>
 
   <!-- 특수구역 검출 노드 (별도 프로세스, special_zone:=true 일 때만 실행) -->
@@ -102,7 +104,7 @@
     <param name="hatch_dark_thresh" value="80" />
     <param name="hatch_white_thresh" value="150" />
     <param name="hatch_inside_min_area" value="2500" />
-    <param name="hatch_white_pct" value="4.0" />
+    <param name="hatch_white_pct" value="10.0" />
   </node>
 
   <!-- RViz (rviz:=false 로 끌 수 있음) -->
