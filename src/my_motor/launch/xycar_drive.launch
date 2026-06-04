@@ -61,10 +61,28 @@
 
     <param name="show_debug" value="true"/>
 
-    <!-- 특수구역(횡단보도/빗금) 정지: special_zone:=false 로 끌 수 있음 -->
+    <!-- 특수구역 정지: 검출은 special_zone_detector 노드, 여기선 상태머신만.
+         special_zone:=false 로 끌 수 있음 (검출 노드도 안 뜸) -->
     <param name="enable_special_zone" value="$(arg special_zone)" />
-    <param name="detect_every" value="1" />
     <param name="i_clamp" value="300.0" />
+
+    <param name="cross_confirm_frames" value="1" />
+    <param name="crosswalk_stop_sec" value="10.0" />
+    <param name="cross_cooldown_sec" value="15.0" />
+
+    <param name="hatch_confirm_frames" value="2" />
+    <param name="hatch_delay_sec" value="1.0" />
+    <param name="hatch_miss_tolerance" value="3" />
+
+    <param name="startup_grace_sec" value="3.0" />
+    <param name="post_resume_grace_sec" value="3.0" />
+  </node>
+
+  <!-- 특수구역 검출 노드 (별도 프로세스, special_zone:=true 일 때만 실행) -->
+  <node if="$(arg special_zone)" name="special_zone_detector" pkg="my_motor"
+        type="special_zone_detector.py" output="screen">
+    <param name="detect_hz" value="15.0" />
+    <param name="show_debug" value="true" />
 
     <param name="detect_roi_top" value="250" />
     <param name="detect_roi_bottom" value="460" />
@@ -80,20 +98,11 @@
     <param name="cross_row_band" value="22" />
     <param name="cross_row_span" value="120" />
     <param name="cross_min_blocks" value="4" />
-    <param name="crosswalk_stop_sec" value="10.0" />
-    <param name="cross_cooldown_sec" value="15.0" />
-    <param name="cross_confirm_frames" value="1" />
 
     <param name="hatch_dark_thresh" value="80" />
     <param name="hatch_white_thresh" value="150" />
     <param name="hatch_inside_min_area" value="2500" />
     <param name="hatch_white_pct" value="4.0" />
-    <param name="hatch_confirm_frames" value="2" />
-    <param name="hatch_delay_sec" value="1.0" />
-    <param name="hatch_miss_tolerance" value="3" />
-
-    <param name="startup_grace_sec" value="3.0" />
-    <param name="post_resume_grace_sec" value="3.0" />
   </node>
 
   <!-- RViz (rviz:=false 로 끌 수 있음) -->

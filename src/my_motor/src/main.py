@@ -5,9 +5,9 @@ import rospy
 import os
 import time
 import numpy as np
+from std_msgs.msg import Int8
 from config import Config
 from lane_drive import ImageProcessor, LidarProcessor, XycarDriver
-from special_zone import SpecialZoneProcessor
 
 class XycarController:
     # 주행 상태
@@ -33,7 +33,6 @@ class XycarController:
         self.image_processor = ImageProcessor(self.cfg)
         self.lidar_processor = LidarProcessor(self.cfg)
         self.xycar_driver = XycarDriver()
-        self.special_zone_processor = SpecialZoneProcessor(self.cfg)
 
         # 특수구역 상태머신 상태 (컨트롤러 소유)
         self.drive_state               = self.STATE_DRIVE
@@ -46,14 +45,20 @@ class XycarController:
         self.hatch_miss                = 0      # 빗금 연속 미검출 카운트 (miss tolerance용)
         self.node_start_time           = None   # run()에서 워밍업 후 설정
 
-        # 검사 결과 캐시 (detect_every>1 일 때 검사 안 한 프레임에서 오버레이용으로 재사용)
-        self.last_cross_blocks = []
-        self.last_hatch_rects  = []
-        self.last_hatch_pct    = 0.0
+        # /special_zone 구독: 검출은 별도 노드(special_zone_detector)가 담당.
+        # 콜백은 최신값만 저장(가벼움), 카운터 갱신은 메인 루프가 메시지 단위로 처리.
+        self.sz_raw = 0       # 비트마스크: 1=횡단보도, 2=빗금
+        self.sz_new = False   # 새 검출 메시지 도착 플래그
+        rospy.Subscriber('/special_zone', Int8, self.special_zone_cb, queue_size=1)
 
         rospy.on_shutdown(self.shutdown)  # 안전 정지 (콜백 등록: 괄호 없이 함수 참조)
 
         self.rate = rospy.Rate(30)
+
+    def special_zone_cb(self, msg):
+        # 가벼운 콜백: 최신 검출 비트마스크만 저장 + 새 메시지 플래그
+        self.sz_raw = msg.data
+        self.sz_new = True
 
     def compute_pid_angle(self, center):
         """center -> PID 조향각. 적분 와인드업 클램프 포함."""
@@ -128,12 +133,12 @@ class XycarController:
                 self.xycar_driver.drive(angle, self.cfg.speed)
             else:
                 # ===== 특수구역 정지 경로 =====
-                # 검사 호출 + confirm 카운터 증가는 detect_every 주기에만 (디바운스 의미 보존)
-                if count % self.cfg.detect_every == 0:
-                    cross_detected, self.last_cross_blocks, _ = \
-                        self.special_zone_processor.detect_crosswalk(frame)
-                    hatch_detected, self.last_hatch_rects, self.last_hatch_pct = \
-                        self.special_zone_processor.detect_hatch(frame)
+                # 검출은 별도 노드가 /special_zone 으로 보냄. confirm 카운터는 메시지 단위로
+                # 갱신(디바운스 = '검출 패스' 단위 유지). 메인 루프 속도와 분리됨.
+                if self.sz_new:
+                    self.sz_new = False
+                    cross_detected = bool(self.sz_raw & 1)
+                    hatch_detected = bool(self.sz_raw & 2)
 
                     # 유예: 시작 직후(startup_grace) 또는 횡단보도 재출발 직후(resume_grace)
                     in_grace = ((now - self.node_start_time) < self.cfg.startup_grace_sec
@@ -200,11 +205,8 @@ class XycarController:
                         self.xycar_driver.drive(angle, self.cfg.speed)
 
             if self.show_debug:
-                # 특수구역 오버레이를 먼저 그리고, draw_debug가 마지막에 한 번만 창 flush
-                if self.cfg.enable_special_zone:
-                    self.special_zone_processor.draw_overlay(
-                        frame, self.last_cross_blocks, self.last_hatch_rects,
-                        self.drive_state, stop_remain, self.last_hatch_pct, hatch_delay_remain)
+                # 특수구역 검출 오버레이는 special_zone_detector 노드가 자체 창에 표시.
+                # 여기선 차선/라이다 디버그 창만 그림.
                 self.image_processor.draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos, corner, left_slope)
 
             count += 1

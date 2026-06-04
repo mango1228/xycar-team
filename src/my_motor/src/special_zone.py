@@ -85,10 +85,10 @@ class SpecialZoneProcessor:
         detected = (white_pct >= self.cfg.hatch_white_pct)
         return detected, stripe_rects, white_pct
 
-    def draw_overlay(self, frame, cross_blocks, hatch_rects, drive_state,
-                     stop_remain, hatch_pct, hatch_delay_remain):
-        """특수구역 관련 오버레이만 그림. imshow/waitKey는 호출하지 않음
-        (창 flush는 ImageProcessor.draw_debug가 단독 담당). 호출 순서: 이 함수 -> draw_debug."""
+    def draw_detect_debug(self, frame, cross_detected, cross_blocks,
+                          hatch_detected, hatch_pct, hatch_rects):
+        """검출 노드(special_zone_detector) 전용 디버그 창. 검출 결과를 자체 창에 표시.
+        (주행 노드와 별개 프로세스라 imshow/waitKey를 직접 호출)."""
         L, T = self.cfg.detect_roi_left, self.cfg.detect_roi_top
 
         # 감지 ROI 박스 (마젠타)
@@ -104,22 +104,13 @@ class SpecialZoneProcessor:
         for (x, y_b, w, h) in hatch_rects:
             cv2.rectangle(frame, (x + L, y_b + T), (x + L + w, y_b + T + h), (0, 0, 255), 1)
 
-        # 주행 상태 라벨 (좌상단)
-        state_color = {
-            "DRIVE":          (0, 255, 0),
-            "CROSSWALK_STOP": (0, 165, 255),
-            "HATCH_STOP":     (0, 0, 255),
-        }
-        color = state_color.get(drive_state, (255, 255, 255))
-        label = drive_state
-        if drive_state == "CROSSWALK_STOP" and stop_remain > 0:
-            label = "CROSSWALK_STOP (%.1fs)" % stop_remain
-        cv2.putText(frame, label, (10, 110),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+        # 검출 상태 텍스트 (좌상단)
+        cross_str = "CROSS: YES" if cross_detected else "CROSS: -"
+        hatch_str = "HATCH: YES (%.1f%%)" % hatch_pct if hatch_detected else "HATCH: - (%.1f%%)" % hatch_pct
+        cv2.putText(frame, cross_str, (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0) if cross_detected else (200, 200, 200), 2)
+        cv2.putText(frame, hatch_str, (10, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255) if hatch_detected else (200, 200, 200), 2)
 
-        # 빗금 비율 / 빗금 정지 대기
-        hatch_info = "hatch=%.1f%%" % hatch_pct
-        if hatch_delay_remain > 0:
-            hatch_info += "  [HATCH in %.1fs]" % hatch_delay_remain
-        cv2.putText(frame, hatch_info, (10, 135),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+        cv2.imshow('special_zone_detector', frame)
+        cv2.waitKey(1)
