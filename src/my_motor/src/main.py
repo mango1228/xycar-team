@@ -26,11 +26,14 @@ class XycarController:
         self.lidar_processor = LidarProcessor(self.cfg)
         self.xycar_driver = XycarDriver()
 
-        rospy.on_shutdown(self.shutdown())  # 안전 정지
+        rospy.on_shutdown(self.shutdown)  # 안전 정지 (콜백 등록: 괄호 없이 함수 참조)
 
         self.rate = rospy.Rate(30)
 
     def run(self):
+        rospy.sleep(2.0)  # 센서 워밍업 대기
+        print("lane_drive started")
+
         count = 0
         while not rospy.is_shutdown():
             image = self.image_processor.image
