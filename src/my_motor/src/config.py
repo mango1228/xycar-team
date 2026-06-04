@@ -88,13 +88,11 @@ class Config:
         self.stripe_min_len         = rospy.get_param("~stripe_min_len", 20)
         self.stripe_max_gap         = rospy.get_param("~stripe_max_gap", 5)
         self.hatch_confirm_frames  = rospy.get_param("~hatch_confirm_frames", 2)
-        # 빗금 흐름: 즉시 정지 → hatch_verify_sec 동안 멈춘 채 검증 → hatch_advance_sec 전진 → 영구정지
+        # 빗금 흐름: 감지 → 차선 따라 hatch_advance_sec 동안 전진 → 영구정지
+        self.hatch_advance_sec     = rospy.get_param("~hatch_advance_sec", 2.0)
+        # (미사용) 옛 검증 흐름 파라미터 — 호환 위해 남겨둠
         self.hatch_verify_sec      = rospy.get_param("~hatch_verify_sec", 1.0)
-        # 검증 중 빗금이 이 시간(초) 이상 안 보이면 오탐 판단 → 재출발.
-        # 999 = 검증(오탐 복귀) 비활성. 켜려면 0.3 정도로.
         self.hatch_lost_sec        = rospy.get_param("~hatch_lost_sec", 999.0)
-        # 빗금 확정 후 영구정지 전 전진 시간(초)
-        self.hatch_advance_sec     = rospy.get_param("~hatch_advance_sec", 1.0)
         # 빗금 확정 카운터가 견딜 연속 미검출 수(검출 패스 단위). 깜빡임에 정지가 리셋되는 것 방지
         self.hatch_miss_tolerance  = int(rospy.get_param("~hatch_miss_tolerance", 3))
 

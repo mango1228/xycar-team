@@ -4,6 +4,7 @@
 import rospy
 import os
 import time
+import cv2
 import numpy as np
 from std_msgs.msg import Int8
 from config import Config
@@ -185,19 +186,6 @@ class XycarController:
                         angle = self.compute_pid_angle(center)
                         self.xycar_driver.drive(angle, self.cfg.speed)
 
-                elif self.drive_state == self.STATE_HATCH_VERIFY:
-                    # 멈춘 채 빗금 검증: 1초 유지=진짜 / 사라지면 오탐 복귀
-                    self.xycar_driver.drive(0, 0)
-                    if now - self.last_hatch_seen > self.cfg.hatch_lost_sec:
-                        rospy.loginfo("[special_zone] 빗금 사라짐(오탐) -> 재출발")
-                        self.reset_pid()
-                        self.drive_state = self.STATE_DRIVE
-                    elif now - self.hatch_verify_start >= self.cfg.hatch_verify_sec:
-                        rospy.loginfo("[special_zone] 빗금 확정 -> %.1f초 전진" % self.cfg.hatch_advance_sec)
-                        self.reset_pid()
-                        self.advance_start = now
-                        self.drive_state   = self.STATE_HATCH_ADVANCE
-
                 elif self.drive_state == self.STATE_CROSSWALK_STOP:
                     # 정지 중 검증: 10초 유지=진짜 / 사라지면 오탐 즉시 복귀
                     self.xycar_driver.drive(0, 0)
@@ -221,20 +209,19 @@ class XycarController:
                         self.xycar_driver.drive(0, 0)
 
                     elif self.hatch_consecutive >= self.cfg.hatch_confirm_frames:
-                        rospy.loginfo("[special_zone] 빗금 감지 -> 정지(검증)")
-                        self.drive_state        = self.STATE_HATCH_VERIFY
-                        self.hatch_verify_start = now
-                        self.last_hatch_seen    = now
-                        self.reset_pid()
-                        self.xycar_driver.drive(0, 0)
+                        rospy.loginfo("[special_zone] 빗금 감지 -> 차선 따라 %.1f초 전진 후 영구정지" % self.cfg.hatch_advance_sec)
+                        self.drive_state   = self.STATE_HATCH_ADVANCE
+                        self.advance_start = now
+                        # PID 상태 유지(계속 주행) → 멈춤 없이 부드럽게 전진
 
                     else:
                         angle = self.compute_pid_angle(center)
                         self.xycar_driver.drive(angle, self.cfg.speed)
 
             if self.show_debug:
-                # 특수구역 검출 오버레이는 special_zone_detector 노드가 자체 창에 표시.
-                # 여기선 차선/라이다 디버그 창만 그림.
+                # 특수구역 상태/카운트다운 (검출 오버레이는 detector 노드 자체 창)
+                if self.cfg.enable_special_zone:
+                    self._draw_status(frame, now)
                 self.image_processor.draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos, corner, left_slope)
 
             count += 1
@@ -244,6 +231,20 @@ class XycarController:
                     % (self.drive_state, mode, center, half_str))
 
             self.rate.sleep()
+
+    def _draw_status(self, frame, now):
+        """특수구역 정지 상태/남은 시간을 차선 디버그 창에 크게 표시."""
+        if self.drive_state == self.STATE_CROSSWALK_STOP:
+            remain = max(0.0, self.cfg.crosswalk_stop_sec - (now - self.stop_start_time))
+            cv2.putText(frame, "CROSSWALK STOP  %.1fs" % remain, (10, 110),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 3)
+        elif self.drive_state == self.STATE_HATCH_ADVANCE:
+            remain = max(0.0, self.cfg.hatch_advance_sec - (now - self.advance_start))
+            cv2.putText(frame, "HATCH ADVANCE  %.1fs" % remain, (10, 110),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
+        elif self.drive_state == self.STATE_HATCH_STOP:
+            cv2.putText(frame, "HATCH STOP", (10, 110),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
 
     def shutdown(self):
         self.xycar_driver.shutdown()
