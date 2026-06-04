@@ -63,6 +63,8 @@ class SpecialZoneProcessor:
             ang = abs(math.degrees(math.atan2(dy, dx)))
             if ang > 90.0:
                 ang = 180.0 - ang          # 0~90 으로 접기 (/ 와 \ 모두 사선으로)
+            if ang < self.cfg.stripe_min_angle_deg:
+                continue                    # 거의 수평인 선분(노이즈)은 각도 평균에서 제외
             length = math.hypot(dx, dy)
             ang_sum += ang * length        # 길이 가중 (긴 모서리가 방향을 지배)
             len_sum += length
