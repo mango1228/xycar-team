@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import rospy
 
 class Config:
@@ -39,3 +41,44 @@ class Config:
         self.center_margin=rospy.get_param("~center_margin", 90)
 
         self.show_debug = rospy.get_param("~show_debug", True)
+
+        # ===== 특수구역(횡단보도/빗금) 정지 =====
+        # 마스터 토글 (false면 특수구역 감지/상태머신 미진입, 기존 차선주행과 동일)
+        self.enable_special_zone = rospy.get_param("~enable_special_zone", False)
+        # 검사 주기: N프레임마다 특수구역 CV 검사 (1=매 프레임). 상태머신/PID/정지타이머는 항상 매 프레임.
+        self.detect_every = max(1, int(rospy.get_param("~detect_every", 1)))  # 0/음수 방지 (ZeroDivision)
+        # PID 적분 와인드업 클램프 (±)
+        self.i_clamp = rospy.get_param("~i_clamp", 300.0)
+
+        # 감지 ROI (화면 하단 중앙)
+        self.detect_roi_top    = rospy.get_param("~detect_roi_top", 250)
+        self.detect_roi_bottom = rospy.get_param("~detect_roi_bottom", 460)
+        self.detect_roi_left   = rospy.get_param("~detect_roi_left", 40)
+        self.detect_roi_right  = rospy.get_param("~detect_roi_right", 600)
+
+        # 횡단보도 감지
+        self.cross_white_thresh   = rospy.get_param("~cross_white_thresh", 180)
+        self.cross_dark_thresh    = rospy.get_param("~cross_dark_thresh", 70)
+        self.cross_blob_min_area  = rospy.get_param("~cross_blob_min_area", 80)
+        self.cross_blob_max_area  = rospy.get_param("~cross_blob_max_area", 2500)
+        self.cross_blob_max_w     = rospy.get_param("~cross_blob_max_w", 110)
+        self.cross_blob_max_h     = rospy.get_param("~cross_blob_max_h", 70)
+        self.cross_row_band       = rospy.get_param("~cross_row_band", 22)
+        self.cross_row_span       = rospy.get_param("~cross_row_span", 120)
+        self.cross_min_blocks     = rospy.get_param("~cross_min_blocks", 4)
+        self.crosswalk_stop_sec   = rospy.get_param("~crosswalk_stop_sec", 10.0)
+        self.cross_cooldown_sec   = rospy.get_param("~cross_cooldown_sec", 15.0)
+        self.cross_confirm_frames = rospy.get_param("~cross_confirm_frames", 1)
+
+        # 빗금(해치) 감지
+        self.hatch_dark_thresh     = rospy.get_param("~hatch_dark_thresh", 80)
+        self.hatch_white_thresh    = rospy.get_param("~hatch_white_thresh", 150)
+        self.hatch_inside_min_area = rospy.get_param("~hatch_inside_min_area", 2500)
+        self.hatch_white_pct       = rospy.get_param("~hatch_white_pct", 4.0)
+        self.hatch_confirm_frames  = rospy.get_param("~hatch_confirm_frames", 2)
+        self.hatch_delay_sec       = rospy.get_param("~hatch_delay_sec", 1.0)
+
+        # 시작 직후 오탐 방지 유예 시간(초)
+        self.startup_grace_sec = rospy.get_param("~startup_grace_sec", 3.0)
+        # 횡단보도 재출발 직후 유예 시간(초): 차가 횡단보도를 지나기 전 빗금 오발동 방지
+        self.post_resume_grace_sec = rospy.get_param("~post_resume_grace_sec", 3.0)
