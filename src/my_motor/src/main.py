@@ -154,23 +154,26 @@ class XycarController:
                     if self.hatch_now:
                         self.last_hatch_seen = now
 
-                    # 유예: 시작 직후(startup_grace) 또는 횡단보도 성공 후(resume_grace) → 둘 다 무시
-                    in_grace = ((now - self.node_start_time) < self.cfg.startup_grace_sec
-                                or now < self.resume_grace_until)
-                    if self.cross_now and not in_grace:
-                        self.cross_consecutive += 1
-                        self.hatch_consecutive  = 0
-                        self.hatch_miss         = 0
-                    else:
-                        self.cross_consecutive = 0
-                        if self.hatch_now and not in_grace:
-                            self.hatch_consecutive += 1
-                            self.hatch_miss = 0
+                    # 트리거 카운터는 DRIVE 상태에서만 갱신.
+                    # (정지 중 누적되면 재출발 직후 무메시지 프레임에서 또 트리거되는 버그 방지)
+                    if self.drive_state == self.STATE_DRIVE:
+                        # 유예: 시작 직후(startup_grace) 또는 횡단보도 성공 후(resume_grace) → 둘 다 무시
+                        in_grace = ((now - self.node_start_time) < self.cfg.startup_grace_sec
+                                    or now < self.resume_grace_until)
+                        if self.cross_now and not in_grace:
+                            self.cross_consecutive += 1
+                            self.hatch_consecutive  = 0
+                            self.hatch_miss         = 0
                         else:
-                            # 연속 미검출이 tolerance를 넘어야만 카운터 리셋(깜빡임 흡수)
-                            self.hatch_miss += 1
-                            if self.hatch_miss >= self.cfg.hatch_miss_tolerance:
-                                self.hatch_consecutive = 0
+                            self.cross_consecutive = 0
+                            if self.hatch_now and not in_grace:
+                                self.hatch_consecutive += 1
+                                self.hatch_miss = 0
+                            else:
+                                # 연속 미검출이 tolerance를 넘어야만 카운터 리셋(깜빡임 흡수)
+                                self.hatch_miss += 1
+                                if self.hatch_miss >= self.cfg.hatch_miss_tolerance:
+                                    self.hatch_consecutive = 0
 
                 # 상태머신은 매 프레임(30Hz) 동작
                 if self.drive_state == self.STATE_HATCH_STOP:
@@ -202,16 +205,22 @@ class XycarController:
                 else:  # STATE_DRIVE
                     if self.cross_consecutive >= self.cfg.cross_confirm_frames:
                         rospy.loginfo("[special_zone] 횡단보도 감지 -> 정지(검증)")
-                        self.drive_state     = self.STATE_CROSSWALK_STOP
-                        self.stop_start_time = now
-                        self.last_cross_seen = now
+                        self.drive_state       = self.STATE_CROSSWALK_STOP
+                        self.stop_start_time   = now
+                        self.last_cross_seen   = now
+                        self.cross_consecutive = 0   # 트리거 후 리셋 (재출발 직후 재트리거 방지)
+                        self.hatch_consecutive = 0
+                        self.hatch_miss        = 0
                         self.reset_pid()
                         self.xycar_driver.drive(0, 0)
 
                     elif self.hatch_consecutive >= self.cfg.hatch_confirm_frames:
                         rospy.loginfo("[special_zone] 빗금 감지 -> 차선 따라 %.1f초 전진 후 영구정지" % self.cfg.hatch_advance_sec)
-                        self.drive_state   = self.STATE_HATCH_ADVANCE
-                        self.advance_start = now
+                        self.drive_state       = self.STATE_HATCH_ADVANCE
+                        self.advance_start     = now
+                        self.cross_consecutive = 0
+                        self.hatch_consecutive = 0
+                        self.hatch_miss        = 0
                         # PID 상태 유지(계속 주행) → 멈춤 없이 부드럽게 전진
 
                     else:

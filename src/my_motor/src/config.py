@@ -51,7 +51,7 @@ class Config:
         self.i_clamp = rospy.get_param("~i_clamp", 300.0)
 
         # 감지 ROI (화면 하단 중앙). int() 보장: 슬라이스 인덱스/ cv2 좌표로 쓰여 float면 크래시
-        self.detect_roi_top    = int(rospy.get_param("~detect_roi_top", 300))
+        self.detect_roi_top    = int(rospy.get_param("~detect_roi_top", 250))
         self.detect_roi_bottom = int(rospy.get_param("~detect_roi_bottom", 400))
         self.detect_roi_left   = int(rospy.get_param("~detect_roi_left", 220))
         self.detect_roi_right  = int(rospy.get_param("~detect_roi_right", 420))
@@ -89,7 +89,7 @@ class Config:
         self.stripe_max_gap         = rospy.get_param("~stripe_max_gap", 5)
         self.hatch_confirm_frames  = rospy.get_param("~hatch_confirm_frames", 2)
         # 빗금 흐름: 감지 → 차선 따라 hatch_advance_sec 동안 전진 → 영구정지
-        self.hatch_advance_sec     = rospy.get_param("~hatch_advance_sec", 2.0)
+        self.hatch_advance_sec     = rospy.get_param("~hatch_advance_sec", 2.5)
         # (미사용) 옛 검증 흐름 파라미터 — 호환 위해 남겨둠
         self.hatch_verify_sec      = rospy.get_param("~hatch_verify_sec", 1.0)
         self.hatch_lost_sec        = rospy.get_param("~hatch_lost_sec", 999.0)
