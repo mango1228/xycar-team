@@ -36,3 +36,8 @@ class/
 *.h5
 data/
 logs/
+
+# 백업 아카이브
+*.tar.xz
+*.tar.gz
+*.zip
