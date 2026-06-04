@@ -51,10 +51,10 @@ class Config:
         self.i_clamp = rospy.get_param("~i_clamp", 300.0)
 
         # 감지 ROI (화면 하단 중앙). int() 보장: 슬라이스 인덱스/ cv2 좌표로 쓰여 float면 크래시
-        self.detect_roi_top    = int(rospy.get_param("~detect_roi_top", 250))
-        self.detect_roi_bottom = int(rospy.get_param("~detect_roi_bottom", 460))
-        self.detect_roi_left   = int(rospy.get_param("~detect_roi_left", 40))
-        self.detect_roi_right  = int(rospy.get_param("~detect_roi_right", 600))
+        self.detect_roi_top    = int(rospy.get_param("~detect_roi_top", 300))
+        self.detect_roi_bottom = int(rospy.get_param("~detect_roi_bottom", 440))
+        self.detect_roi_left   = int(rospy.get_param("~detect_roi_left", 220))
+        self.detect_roi_right  = int(rospy.get_param("~detect_roi_right", 420))
 
         # 횡단보도 감지
         self.cross_white_thresh   = rospy.get_param("~cross_white_thresh", 180)
@@ -72,11 +72,19 @@ class Config:
         self.cross_lost_sec       = rospy.get_param("~cross_lost_sec", 999.0)
         self.cross_confirm_frames = rospy.get_param("~cross_confirm_frames", 1)
 
-        # 빗금(해치) 감지
+        # 어두운 영역 내부 흰 무늬 (횡단보도/빗금 공통)
         self.hatch_dark_thresh     = rospy.get_param("~hatch_dark_thresh", 80)
         self.hatch_white_thresh    = rospy.get_param("~hatch_white_thresh", 150)
         self.hatch_inside_min_area = rospy.get_param("~hatch_inside_min_area", 2500)
-        self.hatch_white_pct       = rospy.get_param("~hatch_white_pct", 13.0)
+
+        # 판정: 흰 비율 >= classify_white_pct 면 내부 선분 평균각(0도=수평,90도=수직)으로 구분
+        #       평균각 >= classify_angle_deg → 횡단보도(세로) / < → 빗금(사선)
+        self.classify_white_pct  = rospy.get_param("~classify_white_pct", 7.0)
+        self.classify_angle_deg  = rospy.get_param("~classify_angle_deg", 60.0)
+        # 내부 선분 검출용 HoughLinesP 파라미터
+        self.stripe_hough_threshold = rospy.get_param("~stripe_hough_threshold", 15)
+        self.stripe_min_len         = rospy.get_param("~stripe_min_len", 20)
+        self.stripe_max_gap         = rospy.get_param("~stripe_max_gap", 5)
         self.hatch_confirm_frames  = rospy.get_param("~hatch_confirm_frames", 2)
         # 빗금 흐름: 즉시 정지 → hatch_verify_sec 동안 멈춘 채 검증 → hatch_advance_sec 전진 → 영구정지
         self.hatch_verify_sec      = rospy.get_param("~hatch_verify_sec", 1.0)

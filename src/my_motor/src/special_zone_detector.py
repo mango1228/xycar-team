@@ -48,15 +48,13 @@ class SpecialZoneDetector:
                 continue
 
             frame = image.copy()
-            cross_detected, cross_blocks, _        = self.sz.detect_crosswalk(frame)
-            hatch_detected, hatch_rects, hatch_pct = self.sz.detect_hatch(frame)
+            verdict, white_pct, avg_angle, segs = self.sz.classify_zone(frame)
 
-            val = (1 if cross_detected else 0) | (2 if hatch_detected else 0)
+            val = (1 if verdict == 'crosswalk' else 0) | (2 if verdict == 'hatch' else 0)
             self.pub.publish(Int8(val))
 
             if self.show_debug:
-                self.sz.draw_detect_debug(frame, cross_detected, cross_blocks,
-                                          hatch_detected, hatch_pct, hatch_rects)
+                self.sz.draw_classify_debug(frame, verdict, white_pct, avg_angle, segs)
 
             self.rate.sleep()
 
