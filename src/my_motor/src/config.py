@@ -67,20 +67,22 @@ class Config:
         self.cross_row_span       = rospy.get_param("~cross_row_span", 120)
         self.cross_min_blocks     = rospy.get_param("~cross_min_blocks", 4)
         self.crosswalk_stop_sec   = rospy.get_param("~crosswalk_stop_sec", 10.0)
-        # 정지 중 횡단보도가 이 시간(초) 이상 안 보이면 오탐 판단 → 10초 안 기다리고 재출발
-        self.cross_lost_sec       = rospy.get_param("~cross_lost_sec", 0.5)
+        # 정지 중 횡단보도가 이 시간(초) 이상 안 보이면 오탐 판단 → 재출발.
+        # 999 = 검증(오탐 복귀) 비활성(항상 10초 정지). 켜려면 0.5 정도로.
+        self.cross_lost_sec       = rospy.get_param("~cross_lost_sec", 999.0)
         self.cross_confirm_frames = rospy.get_param("~cross_confirm_frames", 1)
 
         # 빗금(해치) 감지
         self.hatch_dark_thresh     = rospy.get_param("~hatch_dark_thresh", 80)
         self.hatch_white_thresh    = rospy.get_param("~hatch_white_thresh", 150)
         self.hatch_inside_min_area = rospy.get_param("~hatch_inside_min_area", 2500)
-        self.hatch_white_pct       = rospy.get_param("~hatch_white_pct", 10.0)
+        self.hatch_white_pct       = rospy.get_param("~hatch_white_pct", 13.0)
         self.hatch_confirm_frames  = rospy.get_param("~hatch_confirm_frames", 2)
         # 빗금 흐름: 즉시 정지 → hatch_verify_sec 동안 멈춘 채 검증 → hatch_advance_sec 전진 → 영구정지
         self.hatch_verify_sec      = rospy.get_param("~hatch_verify_sec", 1.0)
-        # 검증 중 빗금이 이 시간(초) 이상 안 보이면 오탐 판단 → 재출발
-        self.hatch_lost_sec        = rospy.get_param("~hatch_lost_sec", 0.3)
+        # 검증 중 빗금이 이 시간(초) 이상 안 보이면 오탐 판단 → 재출발.
+        # 999 = 검증(오탐 복귀) 비활성. 켜려면 0.3 정도로.
+        self.hatch_lost_sec        = rospy.get_param("~hatch_lost_sec", 999.0)
         # 빗금 확정 후 영구정지 전 전진 시간(초)
         self.hatch_advance_sec     = rospy.get_param("~hatch_advance_sec", 1.0)
         # 빗금 확정 카운터가 견딜 연속 미검출 수(검출 패스 단위). 깜빡임에 정지가 리셋되는 것 방지

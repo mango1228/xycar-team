@@ -68,11 +68,13 @@
 
     <param name="cross_confirm_frames" value="1" />
     <param name="crosswalk_stop_sec" value="10.0" />
-    <param name="cross_lost_sec" value="0.5" />
+    <!-- 999 = 정지 중 오탐 복귀 검증 끔(항상 10초 정지). 켜려면 0.5 -->
+    <param name="cross_lost_sec" value="999.0" />
 
     <param name="hatch_confirm_frames" value="2" />
     <param name="hatch_verify_sec" value="1.0" />
-    <param name="hatch_lost_sec" value="0.3" />
+    <!-- 999 = 검증 중 오탐 복귀 끔. 켜려면 0.3 -->
+    <param name="hatch_lost_sec" value="999.0" />
     <param name="hatch_advance_sec" value="1.0" />
     <param name="hatch_miss_tolerance" value="3" />
 
@@ -104,7 +106,7 @@
     <param name="hatch_dark_thresh" value="80" />
     <param name="hatch_white_thresh" value="150" />
     <param name="hatch_inside_min_area" value="2500" />
-    <param name="hatch_white_pct" value="10.0" />
+    <param name="hatch_white_pct" value="13.0" />
   </node>
 
   <!-- RViz (rviz:=false 로 끌 수 있음) -->
