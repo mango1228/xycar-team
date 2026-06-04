@@ -79,7 +79,7 @@
     <param name="hatch_miss_tolerance" value="3" />
 
     <param name="startup_grace_sec" value="3.0" />
-    <param name="post_resume_grace_sec" value="5.0" />
+    <param name="post_resume_grace_sec" value="15.0" />
   </node>
 
   <!-- 특수구역 검출 노드 (별도 프로세스, special_zone:=true 일 때만 실행) -->
@@ -89,7 +89,7 @@
     <param name="show_debug" value="true" />
 
     <param name="detect_roi_top" value="300" />
-    <param name="detect_roi_bottom" value="440" />
+    <param name="detect_roi_bottom" value="400" />
     <param name="detect_roi_left" value="220" />
     <param name="detect_roi_right" value="420" />
 

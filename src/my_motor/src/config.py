@@ -52,7 +52,7 @@ class Config:
 
         # 감지 ROI (화면 하단 중앙). int() 보장: 슬라이스 인덱스/ cv2 좌표로 쓰여 float면 크래시
         self.detect_roi_top    = int(rospy.get_param("~detect_roi_top", 300))
-        self.detect_roi_bottom = int(rospy.get_param("~detect_roi_bottom", 440))
+        self.detect_roi_bottom = int(rospy.get_param("~detect_roi_bottom", 400))
         self.detect_roi_left   = int(rospy.get_param("~detect_roi_left", 220))
         self.detect_roi_right  = int(rospy.get_param("~detect_roi_right", 420))
 
@@ -101,4 +101,5 @@ class Config:
         # 시작 직후 오탐 방지 유예 시간(초)
         self.startup_grace_sec = rospy.get_param("~startup_grace_sec", 3.0)
         # 횡단보도 10초 정지 성공 후 유예 시간(초): 그 동안 횡단보도/빗금 둘 다 감지 무시
-        self.post_resume_grace_sec = rospy.get_param("~post_resume_grace_sec", 5.0)
+        # (같은 횡단보도를 완전히 지나갈 때까지 충분히 길게)
+        self.post_resume_grace_sec = rospy.get_param("~post_resume_grace_sec", 15.0)
