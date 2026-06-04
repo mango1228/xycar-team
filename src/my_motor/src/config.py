@@ -80,7 +80,7 @@ class Config:
         # 판정: 흰 비율 >= classify_white_pct 면 내부 선분 평균각(0도=수평,90도=수직)으로 구분
         #       평균각 >= classify_angle_deg → 횡단보도(세로) / < → 빗금(사선)
         self.classify_white_pct  = rospy.get_param("~classify_white_pct", 10.0)
-        self.classify_angle_deg  = rospy.get_param("~classify_angle_deg", 60.0)
+        self.classify_angle_deg  = rospy.get_param("~classify_angle_deg", 35.0)
         # 이 각도(도) 미만의 거의 수평인 선분은 평균각 계산에서 제외 (노이즈 무시)
         self.stripe_min_angle_deg = rospy.get_param("~stripe_min_angle_deg", 10.0)
         # 내부 선분 검출용 HoughLinesP 파라미터
@@ -89,7 +89,7 @@ class Config:
         self.stripe_max_gap         = rospy.get_param("~stripe_max_gap", 5)
         self.hatch_confirm_frames  = rospy.get_param("~hatch_confirm_frames", 2)
         # 빗금 흐름: 감지 → 차선 따라 hatch_advance_sec 동안 전진 → 영구정지
-        self.hatch_advance_sec     = rospy.get_param("~hatch_advance_sec", 2.5)
+        self.hatch_advance_sec     = rospy.get_param("~hatch_advance_sec", 1.5)
         # (미사용) 옛 검증 흐름 파라미터 — 호환 위해 남겨둠
         self.hatch_verify_sec      = rospy.get_param("~hatch_verify_sec", 1.0)
         self.hatch_lost_sec        = rospy.get_param("~hatch_lost_sec", 999.0)
