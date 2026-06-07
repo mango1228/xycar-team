@@ -116,6 +116,7 @@ class XycarController:
 
             bisector = None
             lidar_c  = None
+            
             if gaps:
                 largest  = max(gaps, key=lambda g: g[1] - g[0])
                 bisector = (largest[0] + largest[1]) / 2.0
