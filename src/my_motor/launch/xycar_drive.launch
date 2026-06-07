@@ -1,0 +1,115 @@
+<launch>
+
+  <!-- 노출값: 실행 시 exposure:=N 으로 덮어쓰기 가능. canny_tune 튜닝 때 쓴 값과 맞출 것 -->
+  <arg name="exposure" default="110" />
+  <!-- RViz: 실행 안 하려면 rviz:=false -->
+  <arg name="rviz" default="true" />
+  <!-- 특수구역(횡단보도/빗금) 정지: 기본 켜짐. 끄려면 special_zone:=false -->
+  <arg name="special_zone" default="true" />
+
+  <!-- 모터 드라이버 -->
+  <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
+
+  <!-- USB 카메라 -->
+  <node name="usb_cam" output="screen" pkg="usb_cam" type="usb_cam_node">
+    <param name="video_device" value="/dev/videoCAM" />
+    <param name="autoexposure" value="false" />
+    <param name="exposure" value="$(arg exposure)" />
+    <param name="image_width" value="640" />
+    <param name="image_height" value="480" />
+    <param name="pixel_format" value="yuyv" />
+    <param name="camera_frame_id" value="usb_cam" />
+    <param name="io_method" value="mmap" />
+  </node>
+
+  <!-- 라이다 드라이버 -->
+  <include file="$(find xycar_lidar)/launch/lidar_noviewer.launch" />
+
+  <!-- 차선주행 노드 -->
+  <node name="lane_drive" pkg="my_motor" type="main.py" output="screen">
+    <param name="lidar_roi_x" value="0.33" />
+    <param name="lidar_roi_y_min" value="-0.45" />
+    <param name="lidar_roi_y_max" value="-0.05" />
+
+    <param name="r_viz" value="0.7" />
+
+    <param name="min_gap_ang" value="0.05" />
+
+    <param name="lidar_center_gain" value="-170.0" />
+
+    <param name="canny_low" value="40" />
+    <param name="canny_high" value="100" />
+    <param name="offset" value="330" />
+    <param name="gap" value="110" />
+
+    <param name="gain" value="0.25" />
+    <param name="gain_i" value="0.01" />
+    <param name="gain_d" value="0.01" />
+
+    <param name="speed" value="5.0" />
+    <param name="ema_alpha" value="0.3" />
+    <param name="one_lane_ratio" value="1.0" />
+    <param name="corner_left_base" value="-0.75" />
+    <param name="corner_slope_thresh" value="0.4" />
+    <param name="corner_shift_px" value="70" />
+
+    <param name="hough_threshold" value="30" />
+    <param name="hough_min_len" value="20" />
+    <param name="hough_max_gap" value="10" />
+
+    <param name="center_margin" value="90" />
+
+    <param name="show_debug" value="true"/>
+
+    <!-- 특수구역 정지: 검출은 special_zone_detector 노드, 여기선 상태머신만.
+         special_zone:=false 로 끌 수 있음 (검출 노드도 안 뜸) -->
+    <param name="enable_special_zone" value="$(arg special_zone)" />
+    <param name="i_clamp" value="300.0" />
+
+    <param name="cross_confirm_frames" value="1" />
+    <param name="crosswalk_stop_sec" value="10.0" />
+    <!-- 999 = 정지 중 오탐 복귀 검증 끔(항상 10초 정지). 켜려면 0.5 -->
+    <param name="cross_lost_sec" value="999.0" />
+
+    <param name="hatch_confirm_frames" value="2" />
+    <param name="hatch_verify_sec" value="1.0" />
+    <!-- 999 = 검증 중 오탐 복귀 끔. 켜려면 0.3 -->
+    <param name="hatch_lost_sec" value="999.0" />
+    <param name="hatch_advance_sec" value="1.5" />
+    <param name="hatch_miss_tolerance" value="3" />
+
+    <param name="startup_grace_sec" value="3.0" />
+    <param name="post_resume_grace_sec" value="15.0" />
+  </node>
+
+  <!-- 특수구역 검출 노드 (별도 프로세스, special_zone:=true 일 때만 실행) -->
+  <node if="$(arg special_zone)" name="special_zone_detector" pkg="my_motor"
+        type="special_zone_detector.py" output="screen">
+    <param name="detect_hz" value="15.0" />
+    <param name="show_debug" value="true" />
+
+    <param name="detect_roi_top" value="310" />
+    <param name="detect_roi_bottom" value="420" />
+    <param name="detect_roi_left" value="150" />
+    <param name="detect_roi_right" value="490" />
+
+    <!-- 어두운 영역 내부 흰 무늬 -->
+    <param name="hatch_dark_thresh" value="80" />
+    <param name="hatch_white_thresh" value="150" />
+    <param name="hatch_inside_min_area" value="2500" />
+
+    <!-- 판정: 흰 비율 >= 7% 면 선분 평균각으로 구분 (0도=수평,90도=수직)
+         평균각 >= 60도 → 횡단보도(세로) / < → 빗금(사선) -->
+    <param name="classify_white_pct" value="7.0" />
+    <param name="classify_angle_deg" value="35.0" />
+    <param name="stripe_min_angle_deg" value="10.0" />
+    <param name="stripe_hough_threshold" value="15" />
+    <param name="stripe_min_len" value="20" />
+    <param name="stripe_max_gap" value="5" />
+  </node>
+
+  <!-- RViz (rviz:=false 로 끌 수 있음) -->
+  <node if="$(arg rviz)" name="rviz" pkg="rviz" type="rviz"
+        args="-d $(find my_motor)/rviz/lane_drive.rviz" output="screen" />
+
+</launch>
