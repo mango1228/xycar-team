@@ -303,3 +303,19 @@ class XycarDriver:
     def shutdown(self):
         rospy.loginfo("Shutting down...")
         self.drive(0, 0)
+
+
+class LaneFollower:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.lidar_c = None
+        self.bisector = None
+
+    def correct_lane(self, gaps, roi_ang_center):
+        largest  = max(gaps, key=lambda g: g[1] - g[0])
+        self.bisector = (largest[0] + largest[1]) / 2.0
+        # ROI_ANG_CENTER - bisector: laser_frame에서 car left/right 방향 보정
+        # bisector > CENTER(=-90°) → car's left → negative offset → steer left
+        dev = roi_ang_center - self.bisector
+        self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * self.cfg.lidar_center_gain)))
+        return self.lidar_c, self.bisector
