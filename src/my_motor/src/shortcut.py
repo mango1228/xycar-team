@@ -121,8 +121,8 @@ class ARtag:
             self.num += 1
             print(self.num) #debug
 
-        if self.num == 2:
-            pass
+        # if self.num == 2:
+        #     pass
 
 # if __name__ == '__main__':
 #     rospy.init_node('lidar_node')
