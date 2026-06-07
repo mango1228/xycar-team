@@ -54,7 +54,8 @@ class Lidar:
 
         if len(current_cluster) > 5:
             clusters.append(current_cluster)
-        
+            print(len(clusters)) #debug
+
         for cluster in clusters:
             center_idx = int(sum(cluster)/len(cluster))
             r = self.lidar_points[center_idx]
@@ -114,24 +115,28 @@ class ARtag:
         rospy.Subscriber('ar_pose_marker', AlvarMarkers, self.callback, queue_size=1)
     
     def callback(self):   
-        pass
+        self.num = 0
 
     def get_info(self):
+            self.num += 1
+            print(self.num) #debug
 
+        if self.num == 2:
+            pass
 
-if __name__ == '__main__':
-    rospy.init_node('lidar_node')
-    lidar = Lidar()
-    artag = ARtag()
-    rate = rospy.Rate(10)
+# if __name__ == '__main__':
+#     rospy.init_node('lidar_node')
+#     lidar = Lidar()
+#     artag = ARtag()
+#     rate = rospy.Rate(10)
 
-    while not rospy.is_shutdown():
-        if lidar.lidar_points is not None:
-            lidar.roi_filter()
-            lidar.process_lidar()
-            lidar.get_mid_point()
-            lidar.drive_go()
-        else:
-            lidar.drive_stop()
+#     while not rospy.is_shutdown():
+#         if lidar.lidar_points is not None:
+#             lidar.roi_filter()
+#             lidar.process_lidar()
+#             lidar.get_mid_point()
+#             lidar.drive_go()
+#         else:
+#             lidar.drive_stop()
 
-        rate.sleep()
+#         rate.sleep()
