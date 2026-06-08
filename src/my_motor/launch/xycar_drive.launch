@@ -75,7 +75,7 @@
     <param name="hatch_verify_sec" value="1.0" />
     <!-- 999 = 검증 중 오탐 복귀 끔. 켜려면 0.3 -->
     <param name="hatch_lost_sec" value="999.0" />
-    <param name="hatch_advance_sec" value="2.0" />
+    <param name="hatch_advance_sec" value="1.5" />
     <param name="hatch_miss_tolerance" value="3" />
 
     <param name="startup_grace_sec" value="3.0" />
