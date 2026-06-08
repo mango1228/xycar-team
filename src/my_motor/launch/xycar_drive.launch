@@ -1,7 +1,7 @@
 <launch>
 
   <!-- 노출값: 실행 시 exposure:=N 으로 덮어쓰기 가능. canny_tune 튜닝 때 쓴 값과 맞출 것 -->
-  <arg name="exposure" default="60" />
+  <arg name="exposure" default="150" />
   <!-- RViz: 실행 안 하려면 rviz:=false -->
   <arg name="rviz" default="true" />
   <!-- 특수구역(횡단보도/빗금) 정지: 기본 켜짐. 끄려면 special_zone:=false -->
