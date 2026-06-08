@@ -15,6 +15,7 @@ from sensor_msgs.msg import Image, LaserScan
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point as GeoPoint
 from xycar_msgs.msg import xycar_motor
+from ar_track_alvar_msgs.msg import AlvarMarkers
 
 
 
@@ -319,3 +320,18 @@ class LaneFollower:
         dev = roi_ang_center - self.bisector
         self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * self.cfg.lidar_center_gain)))
         return self.lidar_c, self.bisector
+    
+
+class ARtagDetector:
+    def __init__(self):
+        rospy.Subscriber('ar_pose_marker', AlvarMarkers, self.callback, queue_size=1)
+        self.detected = False     # 이번 프레임에 마커가 보였나
+        self.marker_id = None
+        self.distance = None      # 카메라 전방 거리(z)
+
+    def callback(self, msg):      # ← 메시지 인자 필수
+        if len(msg.markers) == 0:
+            self.detected = False
+            return
+
+        self.detected = True
