@@ -20,7 +20,18 @@
     <param name="pixel_format" value="yuyv" />
     <param name="camera_frame_id" value="usb_cam" />
     <param name="io_method" value="mmap" />
+ </node> 
+
+  <node name="ar_track_alvar" pkg="ar_track_alvar"
+              type="individualMarkersNoKinect" respawn="false" output="screen">
+    <param name="marker_size" type="double" value="9.0" />
+    <param name="max_new_marker_error" type="double" value="0.05" /> 
+    <param name="max_track_error" type="double" value="0.05" />
+    <param name="output_frame" type="string" value="usb_cam" />
+    <remap from="camera_image" to="/usb_cam/image_raw" />
+    <remap from="camera_info" to="/usb_cam/camera_info" />
   </node>
+  
 
   <!-- 라이다 드라이버 -->
   <include file="$(find xycar_lidar)/launch/lidar_noviewer.launch" />

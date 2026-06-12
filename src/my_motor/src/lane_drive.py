@@ -983,14 +983,14 @@ class LaneFollower:
 
 class ARtagDetector:
     def __init__(self):
-        rospy.Subscriber('ar_pose_marker', AlvarMarkers, self.callback, queue_size=1)
-        self.detected = False     # 이번 프레임에 마커가 보였나
-        self.marker_id = None
-        self.distance = None      # 카메라 전방 거리(z)
+        self.last_seen = 0.0
+        self.hold_sec = 0.5
+        rospy.Subscriber("/ar_pose_marker", AlvarMarkers, self.callback, queue_size=1)
 
-    def callback(self, msg):      # ← 메시지 인자 필수
-        if len(msg.markers) == 0:
-            self.detected = False
-            return
+    def callback(self, msg):
+        if len(msg.markers) > 0:
+            self.last_seen = rospy.get_time()
 
-        self.detected = True
+    @property
+    def ar_detected(self):
+        return (rospy.get_time() - self.last_seen) < self.hold_sec

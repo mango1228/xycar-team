@@ -10,8 +10,8 @@
     <remap from="camera_image" to="/usb_cam/image_raw" />
     <remap from="camera_info" to="/usb_cam/camera_info" />
   </node>
-  <node name="rviz_repub" pkg="ar_viewer" type="ar_viewer.py" output="screen" />
-  <node name="rviz" pkg="rviz" type="rviz"
-                    args="-d $(find ar_viewer)/rviz/ar_viewer.rviz" />
+  <node name="rviz_repub" pkg="ar_viewer" type="ar.py" output="screen" />
+  <!-- <node name="rviz" pkg="rviz" type="rviz"
+                    args="-d $(find ar_viewer)/rviz/ar_viewer.rviz" /> -->
 </launch>
 

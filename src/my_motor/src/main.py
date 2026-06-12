@@ -23,6 +23,10 @@ class XycarController:
         self.cfg = Config()
 
         self.show_debug = self.cfg.show_debug
+        self.ar_follow = False
+        self.ar_prev = False        # 직전 프레임에 AR이 보였는지
+        self.ar_hold_until = 0.0    # 사라진 뒤 이 시각까지 유지
+        self.ar_hold_sec = 2.0      # 사라진 후 유지할 시간(초)
 
         if self.show_debug and not os.environ.get('DISPLAY'):
             rospy.logwarn("DISPLAY 없음 - 디버그 창 비활성화")
@@ -68,13 +72,51 @@ class XycarController:
                 
             self.lidar_processor.publish_roi_markers(roi_data, gaps, bisector, self.lidar_processor.lidar_scan)
             
-            if self.ar_tag_detector.detected and lidar_c is not None:
+            # if self.ar_tag_detector.ar_detected and lidar_c is not None:
+            #     center = lidar_c
+            #     mode = "LIDAR_ONLY"
+            #     self.ar_follow = True
+            #     print("AR detected")
+            # else:
+            #     if self.ar_follow == True:
+            #         center = lidar_c
+            #         mode = "LIDAR_ONLY"
+            #         self.ar_follow = False
+            #         now = time.time()
+            #     if now <= self.ar_hold_time and lidar_c is not None:
+            #         center = lidar_c
+            #         mode = "LIDAR_ONLY"
+            #     else: #lidar_c is not None:
+            #         # 차선 경계 안으로 클램프 (차선 바깥 조향 방지)
+            #         if lpos is not None:
+            #             lidar_c = max(lidar_c, lpos)
+            #         if rpos is not None:
+            #             lidar_c = min(lidar_c, rpos)
+            #         if abs(lidar_c - self.cfg.width // 2) > abs(center - self.cfg.width // 2):
+            #             center = lidar_c
+            #             mode = mode + "+LIDAR"
+            now = time.time()
+            ar_now = self.ar_tag_detector.ar_detected and lidar_c is not None
+
+            if ar_now:
+                # AR이 보이는 동안: 라이다 모드 (타이머는 아직 시작 안 함)
                 center = lidar_c
                 mode = "LIDAR_ONLY"
                 print("AR detected")
-            else:
+            elif self.ar_prev and not ar_now:
+                # ★ 보였다 → 사라진 바로 그 순간: 여기서 N초 타이머 시작
+                self.ar_hold_until = now + self.ar_hold_sec
                 if lidar_c is not None:
-                    # 차선 경계 안으로 클램프 (차선 바깥 조향 방지)
+                    center = lidar_c
+                mode = "LIDAR_HOLD"
+            elif now < self.ar_hold_until:
+                # 사라진 뒤 유지 시간 안: 계속 라이다 모드
+                if lidar_c is not None:
+                    center = lidar_c
+                mode = "LIDAR_HOLD"
+            else:
+                # 유지 시간 끝: 평소 주행 + 라이다 보정
+                if lidar_c is not None:
                     if lpos is not None:
                         lidar_c = max(lidar_c, lpos)
                     if rpos is not None:
@@ -82,6 +124,8 @@ class XycarController:
                     if abs(lidar_c - self.cfg.width // 2) > abs(center - self.cfg.width // 2):
                         center = lidar_c
                         mode = mode + "+LIDAR"
+
+            self.ar_prev = ar_now   # ★ 매 프레임 끝에 현재 상태를 저장 (다음 프레임 비교용)
 
             now = time.time()
 
