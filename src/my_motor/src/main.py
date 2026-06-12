@@ -71,6 +71,7 @@ class XycarController:
             if self.ar_tag_detector.detected and self.ar_tag_detector.distance < 0.5 and lidar_c is not None:
                 center = lidar_c
                 mode = "LIDAR_ONLY"
+                print("AR detected")
             else:
                 if lidar_c is not None:
                     # 차선 경계 안으로 클램프 (차선 바깥 조향 방지)
