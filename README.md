@@ -1,68 +1,14 @@
-# Xycar 자율주행 팀 프로젝트
+# 지름길 test
 
-## 환경
-- OS: Ubuntu 18.04
-- ROS: Melodic Morenia
-- Language: Python
+## lane_drive.py
+### ARtagDetector
+- /ar_pose_marker 구독 -> tag 인식했을 때만 동작
+- 0.5초 이내에 본 기록이 있으면 본 것으로 간주 (def ar_detected)
 
-## 팀 역할 분담
-| 팀원 | 담당 패키지 | 역할 |
-|------|------------|------|
-| 1번 | `sensor_input` | 카메라, IMU 센서 입력 |
-| 2번 | `perception` | 차선인식, 장애물 감지 |
-| 3번 | `control` | 모터 제어, 조향 |
-| 4번 | `integration` | 통합 launch, 테스트 |
+## main.py
+- ar이 보이면 LiDAR에 의존(center = lidar_c)
+- ar이 보이다가 안 보이면 일정시간 동안 LiDAR에 의존(지름길 진입 전)
 
-## 브랜치 전략
-```
-main         ← 최종 완성 코드 (직접 푸시 금지)
-develop      ← 통합 테스트용 브랜치
-feature/xxx  ← 개인 작업 브랜치
-```
-
-### 브랜치 이름 규칙
-```
-feature/lane-detection
-feature/motor-control
-fix/camera-topic-bug
-```
-
-### 작업 흐름
-1. `develop` 에서 `feature/xxx` 브랜치 생성
-2. 작업 후 `develop` 으로 Pull Request
-3. 팀원 1명 이상 리뷰 후 머지
-4. 완성되면 `develop` → `main` 머지
-
-## 로컬 세팅 방법
-
-### 1. 저장소 클론
-```bash
-$ git clone https://github.com/[팀계정]/[저장소명].git ~/xycar_team_ws
-$ cd ~/xycar_team_ws
-```
-
-### 2. ROS 환경 설정 (~/.bashrc에 추가)
-```bash
-source /opt/ros/melodic/setup.bash
-source ~/xycar_team_ws/devel/setup.bash
-alias cm='cd ~/xycar_team_ws && catkin_make'
-```
-```bash
-$ source ~/.bashrc
-```
-
-### 3. 빌드
-```bash
-$ cm
-```
-
-### Xycar 원격 접속 시 추가 설정 (~/.bashrc)
-```bash
-export ROS_MASTER_URI=http://10.42.0.1:11311   # Xycar IP
-export ROS_HOSTNAME=[내 PC IP]                  # ifconfig 로 확인
-```
-
-## 패키지 실행
-```bash
-$ roslaunch integration main.launch
-```
+## 추후 계획
+- ar 인식은 잘 되지만 지름길 바깥쪽으로 가는 문제
+- 지름길 내부에서 oscillation 심하여 장애물 충돌이 일어나는 문제
