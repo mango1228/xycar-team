@@ -103,7 +103,7 @@
     <param name="ar_stop_sec"      value="1.0" />
     <param name="ar_leftmost_sec"  value="1.75" />
     <param name="ar_stop2_sec"     value="1.0" />
-    <param name="ar_rightmost_sec" value="0.5" />
+    <param name="ar_rightmost_sec" value="1.0" />
     <param name="ar_stop3_sec"     value="1.0" />
     <param name="ar_center_sec"    value="10.0" />
     <!-- 중앙 추종 게인 배율 (오른쪽은 x1, 중앙은 x0.6) -->
