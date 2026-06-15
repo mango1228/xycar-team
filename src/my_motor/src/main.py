@@ -6,7 +6,7 @@ import os
 import time
 from std_msgs.msg import Int8
 from config import Config
-from lane_drive import ImageProcessor, LidarProcessor, XycarDriver, LaneFollower
+from lane_drive import ImageProcessor, LidarProcessor, XycarDriver, LaneFollower, ARtagDetector
 from controller import PIDController, SpecialZoneController
 
 class XycarController:
@@ -34,6 +34,7 @@ class XycarController:
         self.xycar_driver = XycarDriver()
         self.lane_follower = LaneFollower(self.cfg)
         self.special_zone_controller = SpecialZoneController(self.cfg, self.pid_controller)
+        self.ar_tag_detector = ARtagDetector()
 
 
         rospy.on_shutdown(self.shutdown)  # 안전 정지 (콜백 등록: 괄호 없이 함수 참조)
@@ -46,7 +47,7 @@ class XycarController:
         print("lane_drive started")
 
         count = 0
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown(): 
             image = self.image_processor.image
             if image.size == 0:
                 self.rate.sleep()
@@ -66,16 +67,21 @@ class XycarController:
                 lidar_c, bisector = self.lane_follower.correct_lane(gaps, self.lidar_processor.roi_ang_center)
                 
             self.lidar_processor.publish_roi_markers(roi_data, gaps, bisector, self.lidar_processor.lidar_scan)
-
-            if lidar_c is not None:
-                # 차선 경계 안으로 클램프 (차선 바깥 조향 방지)
-                if lpos is not None:
-                    lidar_c = max(lidar_c, lpos)
-                if rpos is not None:
-                    lidar_c = min(lidar_c, rpos)
-                if abs(lidar_c - self.cfg.width // 2) > abs(center - self.cfg.width // 2):
-                    center = lidar_c
-                    mode = mode + "+LIDAR"
+            
+            if self.ar_tag_detector.detected and self.ar_tag_detector.distance < 0.5 and lidar_c is not None:
+                center = lidar_c
+                mode = "LIDAR_ONLY"
+                print("AR detected")
+            else:
+                if lidar_c is not None:
+                    # 차선 경계 안으로 클램프 (차선 바깥 조향 방지)
+                    if lpos is not None:
+                        lidar_c = max(lidar_c, lpos)
+                    if rpos is not None:
+                        lidar_c = min(lidar_c, rpos)
+                    if abs(lidar_c - self.cfg.width // 2) > abs(center - self.cfg.width // 2):
+                        center = lidar_c
+                        mode = mode + "+LIDAR"
 
             now = time.time()
 
