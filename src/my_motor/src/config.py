@@ -101,3 +101,48 @@ class Config:
         # 횡단보도 10초 정지 성공 후 유예 시간(초): 그 동안 횡단보도/빗금 둘 다 감지 무시
         # (같은 횡단보도를 완전히 지나갈 때까지 충분히 길게)
         self.post_resume_grace_sec = rospy.get_param("~post_resume_grace_sec", 15.0)
+
+        # ===== AR 태그 이후 라이다 경계 추종 =====
+        self.ar_hold_sec = float(rospy.get_param("~ar_hold_sec", 0.5))
+        self.ar_target_id = int(rospy.get_param("~ar_target_id", -1))
+
+        self.boundary_speed = float(rospy.get_param("~boundary_speed", 4.0))
+
+        # 좌표 기준: forward=-y, lateral=x, 차량 왼쪽이 +lateral
+        self.boundary_forward_min = float(rospy.get_param("~boundary_forward_min", 0.05))
+        self.boundary_forward_max = float(rospy.get_param("~boundary_forward_max", 1.20))
+        self.boundary_lateral_max = float(rospy.get_param("~boundary_lateral_max", 0.80))
+        self.boundary_side_min = float(rospy.get_param("~boundary_side_min", 0.03))
+
+        self.boundary_cluster_min_points = int(rospy.get_param("~boundary_cluster_min_points", 3))
+        self.boundary_cluster_range_jump = float(rospy.get_param("~boundary_cluster_range_jump", 0.18))
+
+        self.boundary_lookahead = float(rospy.get_param("~boundary_lookahead", 0.65))
+        self.boundary_left_offset = float(rospy.get_param("~boundary_left_offset", 0.25))
+
+        self.boundary_center_gain_px_per_m = float(
+            rospy.get_param("~boundary_center_gain_px_per_m", 300.0)
+        )
+        self.boundary_center_max_offset_px = int(
+            rospy.get_param("~boundary_center_max_offset_px", 180)
+        )
+        self.boundary_center_ema_alpha = float(
+            rospy.get_param("~boundary_center_ema_alpha", 0.35)
+        )
+
+        self.boundary_side_trigger_distance = float(
+            rospy.get_param("~boundary_side_trigger_distance", 0.30)
+        )
+        self.boundary_trigger_forward_min = float(
+            rospy.get_param("~boundary_trigger_forward_min", 0.05)
+        )
+        self.boundary_trigger_forward_max = float(
+            rospy.get_param("~boundary_trigger_forward_max", 0.45)
+        )
+        self.boundary_both_confirm_frames = int(
+            rospy.get_param("~boundary_both_confirm_frames", 5)
+        )
+
+        self.boundary_lost_hold_sec = float(
+            rospy.get_param("~boundary_lost_hold_sec", 0.40)
+        )

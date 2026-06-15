@@ -1,104 +1,108 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import rospy
 import os
 import time
-import cv2
-import numpy as np
-from std_msgs.msg import Int8
+
+import rospy
+
 from config import Config
-from lane_drive import ImageProcessor, LidarProcessor, XycarDriver
+from controller import PIDController, SpecialZoneController
+from lane_drive import (
+    ARtagDetector,
+    ImageProcessor,
+    LaneFollower,
+    LidarProcessor,
+    ObstacleBoundaryFollower,
+    XycarDriver,
+)
+
 
 class XycarController:
-    # 주행 상태
-    STATE_DRIVE          = "DRIVE"
-    STATE_CROSSWALK_STOP = "CROSSWALK_STOP"   # 횡단보도 정지(검증). 10초 유지=진짜 / 사라지면 오탐 복귀
-    STATE_HATCH_VERIFY   = "HATCH_VERIFY"     # 빗금 정지 검증. 1초 유지=진짜 / 사라지면 오탐 복귀
-    STATE_HATCH_ADVANCE  = "HATCH_ADVANCE"    # 빗금 확정 후 1초 전진
-    STATE_HATCH_STOP     = "HATCH_STOP"       # 영구 정지
+    STATE_NORMAL = "NORMAL"
+    STATE_LEFT_BOUNDARY = "LEFT_BOUNDARY"
+    STATE_BOTH_BOUNDARY = "BOTH_BOUNDARY"
 
     def __init__(self):
-        rospy.init_node('lane_drive')
+        rospy.init_node("lane_drive")
 
         self.cfg = Config()
-
         self.show_debug = self.cfg.show_debug
 
-        if self.show_debug and not os.environ.get('DISPLAY'):
+        if self.show_debug and not os.environ.get("DISPLAY"):
             rospy.logwarn("DISPLAY 없음 - 디버그 창 비활성화")
             self.show_debug = False
 
-        self.prev_error = 0.0
-        self.i_error = 0.0
-        self.pid_time = None
-
+        self.pid_controller = PIDController(self.cfg)
         self.image_processor = ImageProcessor(self.cfg)
         self.lidar_processor = LidarProcessor(self.cfg)
         self.xycar_driver = XycarDriver()
+        self.lane_follower = LaneFollower(self.cfg)
+        self.special_zone_controller = SpecialZoneController(
+            self.cfg, self.pid_controller
+        )
+        self.ar_tag_detector = ARtagDetector(self.cfg)
+        self.boundary_follower = ObstacleBoundaryFollower(self.cfg)
 
-        # 특수구역 상태머신 상태 (컨트롤러 소유)
-        self.drive_state         = self.STATE_DRIVE
-        self.stop_start_time     = None         # 횡단보도 정지 시작 시각
-        self.hatch_verify_start  = None         # 빗금 검증 시작 시각
-        self.advance_start       = None         # 빗금 전진 시작 시각
-        self.resume_grace_until  = 0.0          # 횡단보도 성공 후 둘 다 무시하는 유예 마감 시각
-        self.last_cross_seen     = 0.0          # 횡단보도가 마지막으로 검출된 시각
-        self.last_hatch_seen     = 0.0          # 빗금이 마지막으로 검출된 시각
-        self.cross_now           = False        # 최신 메시지의 횡단보도 검출값
-        self.hatch_now           = False        # 최신 메시지의 빗금 검출값
-        self.cross_consecutive   = 0
-        self.hatch_consecutive   = 0
-        self.hatch_miss          = 0            # 빗금 연속 미검출 카운트 (miss tolerance용)
-        self.node_start_time     = None         # run()에서 워밍업 후 설정
+        self.mission_state = self.STATE_NORMAL
+        self.ar_seen_once = False
+        self.ar_prev_visible = False
 
-        # /special_zone 구독: 검출은 별도 노드(special_zone_detector)가 담당.
-        # 콜백은 최신값만 저장(가벼움), 카운터 갱신은 메인 루프가 메시지 단위로 처리.
-        self.sz_raw = 0       # 비트마스크: 1=횡단보도, 2=빗금
-        self.sz_new = False   # 새 검출 메시지 도착 플래그
-        rospy.Subscriber('/special_zone', Int8, self.special_zone_cb, queue_size=1)
-
-        rospy.on_shutdown(self.shutdown)  # 안전 정지 (콜백 등록: 괄호 없이 함수 참조)
-
+        rospy.on_shutdown(self.shutdown)
         self.rate = rospy.Rate(30)
 
-    def special_zone_cb(self, msg):
-        # 가벼운 콜백: 최신 검출 비트마스크만 저장 + 새 메시지 플래그
-        self.sz_raw = msg.data
-        self.sz_new = True
+    def _change_mission_state(self, new_state, reason):
+        if self.mission_state == new_state:
+            return
 
-    def compute_pid_angle(self, center):
-        """center -> PID 조향각. 적분 와인드업 클램프 포함."""
-        now   = time.time()
-        error = center - self.cfg.width // 2
+        rospy.loginfo(
+            "[AR boundary] state: %s -> %s (%s)" %
+            (self.mission_state, new_state, reason)
+        )
+        self.mission_state = new_state
+        self.pid_controller.reset_pid()
 
-        if self.pid_time is None:
-            # 첫 프레임/reset 직후: 미분 기준이 없음 → D 스킵, P만 (조향 튐 방지)
-            self.pid_time   = now
-            self.prev_error = error
-            return max(-50, min(50, error * self.cfg.gain))
+    def _normal_drive_center(self, camera_center, lpos, rpos, lidar_center):
+        center = camera_center
+        mode_suffix = ""
 
-        dt = max(now - self.pid_time, 1e-6)
-        self.pid_time = now
+        if lidar_center is not None:
+            corrected_lidar_center = lidar_center
 
-        self.i_error += error * dt
-        self.i_error = float(np.clip(self.i_error, -self.cfg.i_clamp, self.cfg.i_clamp))  # 와인드업 방지
-        d_out = (error - self.prev_error) / dt
-        self.prev_error = error
+            if lpos is not None:
+                corrected_lidar_center = max(corrected_lidar_center, lpos)
+            if rpos is not None:
+                corrected_lidar_center = min(corrected_lidar_center, rpos)
 
-        angle = error * self.cfg.gain + self.i_error * self.cfg.gain_i + d_out * self.cfg.gain_d
-        return max(-50, min(50, angle))
+            if abs(corrected_lidar_center - self.cfg.width // 2) > \
+                    abs(center - self.cfg.width // 2):
+                center = corrected_lidar_center
+                mode_suffix = "+LIDAR"
 
-    def reset_pid(self):
-        """정지/재출발 시 PID 상태 초기화 (D항 스파이크 / I항 누적 방지)."""
-        self.prev_error = 0.0
-        self.i_error    = 0.0
-        self.pid_time   = None
+        return center, mode_suffix
+
+    def _compute_drive_command(self, now, center, requested_speed, boundary_safe):
+        if not self.cfg.enable_special_zone:
+            angle = self.pid_controller.compute_pid_angle(center)
+            speed = requested_speed
+        else:
+            self.special_zone_controller.update_zone(now)
+            angle, speed = self.special_zone_controller.drive_special(now, center)
+
+            if self.special_zone_controller.drive_state == \
+                    self.special_zone_controller.STATE_DRIVE:
+                speed = requested_speed
+
+        if not boundary_safe:
+            angle = 0
+            speed = 0
+
+        return angle, speed
 
     def run(self):
-        rospy.sleep(2.0)  # 센서 워밍업 대기
-        self.node_start_time = time.time()
-        print("lane_drive started")
+        rospy.sleep(2.0)
+        self.special_zone_controller.node_start_time = time.time()
+        rospy.loginfo("lane_drive started")
 
         count = 0
         while not rospy.is_shutdown():
@@ -108,157 +112,177 @@ class XycarController:
                 continue
 
             frame = image.copy()
-            center, mode, left, right, lpos, rpos, corner, left_slope = self.image_processor.process(frame)
-            cam_center = center
+            (
+                camera_center,
+                camera_mode,
+                left,
+                right,
+                lpos,
+                rpos,
+                corner,
+                left_slope,
+            ) = self.image_processor.process(frame)
 
-            roi_data = self.lidar_processor.get_roi_data(self.lidar_processor.lidar_scan)
-            gaps     = self.lidar_processor.get_gaps(roi_data)
+            scan = self.lidar_processor.lidar_scan
+            roi_data = self.lidar_processor.get_roi_data(scan)
+            gaps = self.lidar_processor.get_gaps(roi_data)
 
+            lidar_center = None
             bisector = None
-            lidar_c  = None
             if gaps:
-                largest  = max(gaps, key=lambda g: g[1] - g[0])
-                bisector = (largest[0] + largest[1]) / 2.0
-                # ROI_ANG_CENTER - bisector: laser_frame에서 car left/right 방향 보정
-                # bisector > CENTER(=-90°) → car's left → negative offset → steer left
-                dev = self.lidar_processor.roi_ang_center - bisector
-                lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * self.cfg.lidar_center_gain)))
+                lidar_center, bisector = self.lane_follower.correct_lane(
+                    gaps, self.lidar_processor.roi_ang_center
+                )
 
-            self.lidar_processor.publish_roi_markers(roi_data, gaps, bisector, self.lidar_processor.lidar_scan)
+            self.lidar_processor.publish_roi_markers(
+                roi_data, gaps, bisector, scan
+            )
 
-            if lidar_c is not None:
-                # 차선 경계 안으로 클램프 (차선 바깥 조향 방지)
-                if lpos is not None:
-                    lidar_c = max(lidar_c, lpos)
-                if rpos is not None:
-                    lidar_c = min(lidar_c, rpos)
-                if abs(lidar_c - self.cfg.width // 2) > abs(center - self.cfg.width // 2):
-                    center = lidar_c
-                    mode = mode + "+LIDAR"
+            ar_visible = self.ar_tag_detector.ar_detected
+            if ar_visible:
+                self.ar_seen_once = True
+
+            ar_just_disappeared = (
+                self.ar_seen_once and
+                self.ar_prev_visible and
+                not ar_visible
+            )
+
+            if self.mission_state == self.STATE_NORMAL and ar_just_disappeared:
+                self.boundary_follower.reset()
+                self._change_mission_state(
+                    self.STATE_LEFT_BOUNDARY,
+                    "AR tag disappeared"
+                )
+
+            center = camera_center
+            mode = camera_mode
+            requested_speed = self.cfg.speed
+            boundary_safe = True
+            boundary_result = None
+
+            if self.mission_state == self.STATE_NORMAL:
+                center, mode_suffix = self._normal_drive_center(
+                    camera_center, lpos, rpos, lidar_center
+                )
+                mode = camera_mode + mode_suffix
+
+            elif self.mission_state == self.STATE_LEFT_BOUNDARY:
+                boundary_result = self.boundary_follower.compute(
+                    scan, ObstacleBoundaryFollower.MODE_LEFT
+                )
+                center = boundary_result["center"]
+                mode = boundary_result["source"]
+                requested_speed = self.cfg.boundary_speed
+                boundary_safe = (
+                    boundary_result["valid"] or boundary_result["held"]
+                )
+
+                if boundary_result["both_confirmed"]:
+                    self._change_mission_state(
+                        self.STATE_BOTH_BOUNDARY,
+                        "left/right obstacle within %.2f m for %d frames" %
+                        (
+                            self.cfg.boundary_side_trigger_distance,
+                            self.cfg.boundary_both_confirm_frames,
+                        )
+                    )
+
+                    boundary_result = self.boundary_follower.compute(
+                        scan, ObstacleBoundaryFollower.MODE_BOTH
+                    )
+                    center = boundary_result["center"]
+                    mode = boundary_result["source"]
+                    boundary_safe = (
+                        boundary_result["valid"] or boundary_result["held"]
+                    )
+
+            else:
+                boundary_result = self.boundary_follower.compute(
+                    scan, ObstacleBoundaryFollower.MODE_BOTH
+                )
+                center = boundary_result["center"]
+                mode = boundary_result["source"]
+                requested_speed = self.cfg.boundary_speed
+                boundary_safe = (
+                    boundary_result["valid"] or boundary_result["held"]
+                )
 
             now = time.time()
-
-            if not self.cfg.enable_special_zone:
-                # ===== 기존 차선주행 경로 (특수구역 off) =====
-                angle = self.compute_pid_angle(center)
-                self.xycar_driver.drive(angle, self.cfg.speed)
-            else:
-                # ===== 특수구역 정지 경로 =====
-                # 검출은 별도 노드가 /special_zone 으로 보냄. 메시지 단위로 카운터/최근검출시각 갱신.
-                if self.sz_new:
-                    self.sz_new = False
-                    self.cross_now = bool(self.sz_raw & 1)
-                    self.hatch_now = bool(self.sz_raw & 2)
-                    if self.cross_now:
-                        self.last_cross_seen = now
-                    if self.hatch_now:
-                        self.last_hatch_seen = now
-
-                    # 트리거 카운터는 DRIVE 상태에서만 갱신.
-                    # (정지 중 누적되면 재출발 직후 무메시지 프레임에서 또 트리거되는 버그 방지)
-                    if self.drive_state == self.STATE_DRIVE:
-                        # 유예: 시작 직후(startup_grace) 또는 횡단보도 성공 후(resume_grace) → 둘 다 무시
-                        in_grace = ((now - self.node_start_time) < self.cfg.startup_grace_sec
-                                    or now < self.resume_grace_until)
-                        if self.cross_now and not in_grace:
-                            self.cross_consecutive += 1
-                            self.hatch_consecutive  = 0
-                            self.hatch_miss         = 0
-                        else:
-                            self.cross_consecutive = 0
-                            if self.hatch_now and not in_grace:
-                                self.hatch_consecutive += 1
-                                self.hatch_miss = 0
-                            else:
-                                # 연속 미검출이 tolerance를 넘어야만 카운터 리셋(깜빡임 흡수)
-                                self.hatch_miss += 1
-                                if self.hatch_miss >= self.cfg.hatch_miss_tolerance:
-                                    self.hatch_consecutive = 0
-
-                # 상태머신은 매 프레임(30Hz) 동작
-                if self.drive_state == self.STATE_HATCH_STOP:
-                    self.xycar_driver.drive(0, 0)                       # 영구 정지
-
-                elif self.drive_state == self.STATE_HATCH_ADVANCE:
-                    # 빗금 확정 후 차선 따라 전진 → 시간 다 되면 영구 정지
-                    if now - self.advance_start >= self.cfg.hatch_advance_sec:
-                        rospy.loginfo("[special_zone] 빗금 전진 완료 -> 영구 정지")
-                        self.drive_state = self.STATE_HATCH_STOP
-                        self.xycar_driver.drive(0, 0)
-                    else:
-                        angle = self.compute_pid_angle(center)
-                        self.xycar_driver.drive(angle, self.cfg.speed)
-
-                elif self.drive_state == self.STATE_CROSSWALK_STOP:
-                    # 정지 중 검증: 10초 유지=진짜 / 사라지면 오탐 즉시 복귀
-                    self.xycar_driver.drive(0, 0)
-                    if now - self.last_cross_seen > self.cfg.cross_lost_sec:
-                        rospy.loginfo("[special_zone] 횡단보도 아님(오탐) -> 재출발")
-                        self.reset_pid()
-                        self.drive_state = self.STATE_DRIVE
-                    elif now - self.stop_start_time >= self.cfg.crosswalk_stop_sec:
-                        rospy.loginfo("[special_zone] 횡단보도 10초 정지 완료 -> 재출발(+%.1f초 유예)" % self.cfg.post_resume_grace_sec)
-                        self.resume_grace_until = now + self.cfg.post_resume_grace_sec
-                        self.reset_pid()
-                        self.drive_state = self.STATE_DRIVE
-
-                else:  # STATE_DRIVE
-                    if self.cross_consecutive >= self.cfg.cross_confirm_frames:
-                        rospy.loginfo("[special_zone] 횡단보도 감지 -> 정지(검증)")
-                        self.drive_state       = self.STATE_CROSSWALK_STOP
-                        self.stop_start_time   = now
-                        self.last_cross_seen   = now
-                        self.cross_consecutive = 0   # 트리거 후 리셋 (재출발 직후 재트리거 방지)
-                        self.hatch_consecutive = 0
-                        self.hatch_miss        = 0
-                        self.reset_pid()
-                        self.xycar_driver.drive(0, 0)
-
-                    elif self.hatch_consecutive >= self.cfg.hatch_confirm_frames:
-                        rospy.loginfo("[special_zone] 빗금 감지 -> 차선 따라 %.1f초 전진 후 영구정지" % self.cfg.hatch_advance_sec)
-                        self.drive_state       = self.STATE_HATCH_ADVANCE
-                        self.advance_start     = now
-                        self.cross_consecutive = 0
-                        self.hatch_consecutive = 0
-                        self.hatch_miss        = 0
-                        # PID 상태 유지(계속 주행) → 멈춤 없이 부드럽게 전진
-
-                    else:
-                        angle = self.compute_pid_angle(center)
-                        self.xycar_driver.drive(angle, self.cfg.speed)
+            angle, speed = self._compute_drive_command(
+                now, center, requested_speed, boundary_safe
+            )
+            self.xycar_driver.drive(angle, speed)
 
             if self.show_debug:
-                # 특수구역 상태/카운트다운 (검출 오버레이는 detector 노드 자체 창)
                 if self.cfg.enable_special_zone:
-                    self._draw_status(frame, now)
-                self.image_processor.draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos, corner, left_slope)
+                    self.special_zone_controller.draw_status(frame, now)
+
+                debug_lidar_center = lidar_center
+                if boundary_result is not None:
+                    debug_lidar_center = boundary_result["center"]
+
+                self.image_processor.draw_debug(
+                    frame,
+                    center,
+                    "%s/%s" % (self.mission_state, mode),
+                    left,
+                    right,
+                    camera_center,
+                    debug_lidar_center,
+                    lpos,
+                    rpos,
+                    corner,
+                    left_slope,
+                )
+
+            self.ar_prev_visible = ar_visible
 
             count += 1
             if count % 30 == 0:
-                half_str = "%.0f" % self.image_processor.ema_half_width if self.image_processor.ema_half_width is not None else "-"
-                print("state=%s mode=%s center=%d ema_half=%s"
-                    % (self.drive_state, mode, center, half_str))
+                half_str = (
+                    "%.0f" % self.image_processor.ema_half_width
+                    if self.image_processor.ema_half_width is not None
+                    else "-"
+                )
+
+                if boundary_result is None:
+                    rospy.loginfo(
+                        "mission=%s ar=%s mode=%s center=%d angle=%d speed=%d ema_half=%s" %
+                        (
+                            self.mission_state,
+                            str(ar_visible),
+                            mode,
+                            center,
+                            int(angle),
+                            int(speed),
+                            half_str,
+                        )
+                    )
+                else:
+                    rospy.loginfo(
+                        "mission=%s mode=%s center=%d angle=%d speed=%d "
+                        "left=%s right=%s near_count=%d safe=%s" %
+                        (
+                            self.mission_state,
+                            mode,
+                            center,
+                            int(angle),
+                            int(speed),
+                            str(boundary_result["left_lateral"]),
+                            str(boundary_result["right_lateral"]),
+                            int(boundary_result["both_near_count"]),
+                            str(boundary_safe),
+                        )
+                    )
 
             self.rate.sleep()
-
-    def _draw_status(self, frame, now):
-        """특수구역 정지 상태/남은 시간을 차선 디버그 창에 크게 표시."""
-        if self.drive_state == self.STATE_CROSSWALK_STOP:
-            remain = max(0.0, self.cfg.crosswalk_stop_sec - (now - self.stop_start_time))
-            cv2.putText(frame, "CROSSWALK STOP  %.1fs" % remain, (10, 110),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 3)
-        elif self.drive_state == self.STATE_HATCH_ADVANCE:
-            remain = max(0.0, self.cfg.hatch_advance_sec - (now - self.advance_start))
-            cv2.putText(frame, "HATCH ADVANCE  %.1fs" % remain, (10, 110),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
-        elif self.drive_state == self.STATE_HATCH_STOP:
-            cv2.putText(frame, "HATCH STOP", (10, 110),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
 
     def shutdown(self):
         self.xycar_driver.shutdown()
         self.image_processor.shutdown()
 
-if __name__ == '__main__':
-    xycar_controller = XycarController()
-    xycar_controller.run()
+
+if __name__ == "__main__":
+    controller = XycarController()
+    controller.run()

@@ -15,6 +15,7 @@ from sensor_msgs.msg import Image, LaserScan
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point as GeoPoint
 from xycar_msgs.msg import xycar_motor
+from ar_track_alvar_msgs.msg import AlvarMarkers
 
 
 
@@ -820,8 +821,6 @@ class ImageProcessor:
             cv2.destroyAllWindows()
         except Exception:
             pass
-
-
 class LidarProcessor:
     def __init__ (self, cfg):
         self.cfg = cfg
@@ -964,3 +963,300 @@ class XycarDriver:
     def shutdown(self):
         rospy.loginfo("Shutting down...")
         self.drive(0, 0)
+
+
+class LaneFollower:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.lidar_c = None
+        self.bisector = None
+
+    def correct_lane(self, gaps, roi_ang_center):
+        largest  = max(gaps, key=lambda g: g[1] - g[0])
+        self.bisector = (largest[0] + largest[1]) / 2.0
+        # ROI_ANG_CENTER - bisector: laser_frame에서 car left/right 방향 보정
+        # bisector > CENTER(=-90°) → car's left → negative offset → steer left
+        dev = roi_ang_center - self.bisector
+        self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * self.cfg.lidar_center_gain)))
+        return self.lidar_c, self.bisector
+    
+
+
+class ARtagDetector:
+    """ar_track_alvar의 /ar_pose_marker 결과로 AR 태그 보임 여부를 관리한다."""
+
+    def __init__(self, cfg=None):
+        self.last_seen = None
+        self.marker_id = None
+        self.distance = None
+        self.ever_seen = False
+
+        default_hold = 0.5 if cfg is None else cfg.ar_hold_sec
+        default_target_id = -1 if cfg is None else cfg.ar_target_id
+
+        self.hold_sec = float(rospy.get_param("~ar_hold_sec", default_hold))
+        self.target_id = int(rospy.get_param("~ar_target_id", default_target_id))
+
+        rospy.Subscriber("/ar_pose_marker", AlvarMarkers, self.callback, queue_size=1)
+
+    def callback(self, msg):
+        matched = []
+        for marker in msg.markers:
+            marker_id = int(marker.id)
+            if self.target_id < 0 or marker_id == self.target_id:
+                matched.append(marker)
+
+        if not matched:
+            return
+
+        def marker_distance(marker):
+            p = marker.pose.pose.position
+            return math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z)
+
+        nearest = min(matched, key=marker_distance)
+        self.last_seen = rospy.get_time()
+        self.marker_id = int(nearest.id)
+        self.distance = marker_distance(nearest)
+        self.ever_seen = True
+
+    @property
+    def ar_detected(self):
+        if self.last_seen is None:
+            return False
+        return (rospy.get_time() - self.last_seen) < self.hold_sec
+
+    @property
+    def detected(self):
+        return self.ar_detected
+
+
+class ObstacleBoundaryFollower:
+    """AR 태그가 사라진 뒤 라이다 장애물을 경계선으로 사용한다."""
+
+    MODE_LEFT = "LEFT_BOUNDARY"
+    MODE_BOTH = "BOTH_BOUNDARY"
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.last_center = int(cfg.width // 2)
+        self.filtered_center = None
+        self.last_valid_time = None
+        self.both_near_count = 0
+        self.last_debug = {}
+
+    def reset(self):
+        self.last_center = int(self.cfg.width // 2)
+        self.filtered_center = None
+        self.last_valid_time = None
+        self.both_near_count = 0
+        self.last_debug = {}
+
+    def _extract_clusters(self, scan):
+        if scan is None:
+            return []
+
+        clusters = []
+        current = []
+        prev_index = None
+        prev_range = None
+
+        for i, r in enumerate(scan.ranges):
+            valid = not (math.isnan(r) or math.isinf(r))
+            if valid:
+                valid = (r >= scan.range_min and r <= scan.range_max)
+
+            if valid:
+                angle = scan.angle_min + i * scan.angle_increment
+                lateral = math.cos(angle) * r
+                forward = -math.sin(angle) * r
+                valid = (
+                    self.cfg.boundary_forward_min <= forward <= self.cfg.boundary_forward_max and
+                    abs(lateral) <= self.cfg.boundary_lateral_max
+                )
+
+            if not valid:
+                if len(current) >= self.cfg.boundary_cluster_min_points:
+                    clusters.append(current)
+                current = []
+                prev_index = None
+                prev_range = None
+                continue
+
+            split = False
+            if prev_index is not None and i != prev_index + 1:
+                split = True
+            if prev_range is not None and abs(r - prev_range) > self.cfg.boundary_cluster_range_jump:
+                split = True
+
+            if split:
+                if len(current) >= self.cfg.boundary_cluster_min_points:
+                    clusters.append(current)
+                current = []
+
+            current.append((forward, lateral, r, i))
+            prev_index = i
+            prev_range = r
+
+        if len(current) >= self.cfg.boundary_cluster_min_points:
+            clusters.append(current)
+
+        return clusters
+
+    @staticmethod
+    def _median_lateral(cluster):
+        return float(np.median([p[1] for p in cluster]))
+
+    def _select_boundaries(self, clusters):
+        left_candidates = []
+        right_candidates = []
+
+        for cluster in clusters:
+            lateral_med = self._median_lateral(cluster)
+            if lateral_med > self.cfg.boundary_side_min:
+                left_candidates.append(cluster)
+            elif lateral_med < -self.cfg.boundary_side_min:
+                right_candidates.append(cluster)
+
+        left = max(left_candidates, key=self._median_lateral) if left_candidates else None
+        right = min(right_candidates, key=self._median_lateral) if right_candidates else None
+        return left, right
+
+    def _boundary_lateral_at_lookahead(self, cluster):
+        if cluster is None or len(cluster) == 0:
+            return None
+
+        forward = np.array([p[0] for p in cluster], dtype=float)
+        lateral = np.array([p[1] for p in cluster], dtype=float)
+
+        if len(cluster) < 2 or float(np.max(forward) - np.min(forward)) < 0.05:
+            return float(np.median(lateral))
+
+        try:
+            coeff = np.polyfit(forward, lateral, 1)
+            slope = float(np.clip(coeff[0], -2.0, 2.0))
+            intercept = float(coeff[1])
+            return slope * self.cfg.boundary_lookahead + intercept
+        except Exception:
+            return float(np.median(lateral))
+
+    def _check_both_near(self, clusters):
+        left_distance = None
+        right_distance = None
+
+        for cluster in clusters:
+            for forward, lateral, _, _ in cluster:
+                if not (self.cfg.boundary_trigger_forward_min <= forward <=
+                        self.cfg.boundary_trigger_forward_max):
+                    continue
+
+                if lateral > self.cfg.boundary_side_min:
+                    d = abs(lateral)
+                    if left_distance is None or d < left_distance:
+                        left_distance = d
+                elif lateral < -self.cfg.boundary_side_min:
+                    d = abs(lateral)
+                    if right_distance is None or d < right_distance:
+                        right_distance = d
+
+        left_near = (
+            left_distance is not None and
+            left_distance <= self.cfg.boundary_side_trigger_distance
+        )
+        right_near = (
+            right_distance is not None and
+            right_distance <= self.cfg.boundary_side_trigger_distance
+        )
+
+        both_near = left_near and right_near
+        if both_near:
+            self.both_near_count += 1
+        else:
+            self.both_near_count = 0
+
+        confirmed = self.both_near_count >= self.cfg.boundary_both_confirm_frames
+        return both_near, confirmed, left_distance, right_distance
+
+    def _target_to_center(self, target_lateral):
+        raw_center = (
+            self.cfg.width // 2 +
+            target_lateral * self.cfg.boundary_center_gain_px_per_m
+        )
+
+        min_center = self.cfg.width // 2 - self.cfg.boundary_center_max_offset_px
+        max_center = self.cfg.width // 2 + self.cfg.boundary_center_max_offset_px
+        raw_center = max(min_center, min(max_center, raw_center))
+
+        alpha = self.cfg.boundary_center_ema_alpha
+        if self.filtered_center is None:
+            self.filtered_center = float(raw_center)
+        else:
+            self.filtered_center = (
+                alpha * float(raw_center) +
+                (1.0 - alpha) * self.filtered_center
+            )
+
+        center = int(round(self.filtered_center))
+        return max(0, min(self.cfg.width - 1, center))
+
+    def compute(self, scan, mode):
+        now = rospy.get_time()
+        clusters = self._extract_clusters(scan)
+        left_cluster, right_cluster = self._select_boundaries(clusters)
+
+        left_lateral = self._boundary_lateral_at_lookahead(left_cluster)
+        right_lateral = self._boundary_lateral_at_lookahead(right_cluster)
+
+        both_near, both_confirmed, left_near_dist, right_near_dist = \
+            self._check_both_near(clusters)
+
+        target_lateral = None
+        valid = False
+        source = "NONE"
+
+        if mode == self.MODE_LEFT:
+            if left_lateral is not None:
+                target_lateral = left_lateral - self.cfg.boundary_left_offset
+                valid = True
+                source = "LEFTMOST_OBSTACLE"
+        elif mode == self.MODE_BOTH:
+            if left_lateral is not None and right_lateral is not None:
+                target_lateral = (left_lateral + right_lateral) / 2.0
+                valid = True
+                source = "BOTH_BOUNDARIES"
+
+        held = False
+        if valid:
+            center = self._target_to_center(target_lateral)
+            self.last_center = center
+            self.last_valid_time = now
+        else:
+            can_hold = (
+                self.last_valid_time is not None and
+                (now - self.last_valid_time) <= self.cfg.boundary_lost_hold_sec
+            )
+            if can_hold:
+                center = self.last_center
+                held = True
+                source = "HOLD_LAST_CENTER"
+            else:
+                center = int(self.cfg.width // 2)
+                source = "BOUNDARY_LOST_STOP"
+
+        self.last_debug = {
+            "mode": mode,
+            "center": center,
+            "valid": valid,
+            "held": held,
+            "source": source,
+            "target_lateral": target_lateral,
+            "left_lateral": left_lateral,
+            "right_lateral": right_lateral,
+            "left_near_distance": left_near_dist,
+            "right_near_distance": right_near_dist,
+            "both_near": both_near,
+            "both_near_count": self.both_near_count,
+            "both_confirmed": both_confirmed,
+            "cluster_count": len(clusters),
+        }
+        return self.last_debug
+
