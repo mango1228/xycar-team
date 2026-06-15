@@ -77,9 +77,9 @@ class Config:
         # [0~adv] 차선추종 전진 → [adv~adv+stop] 정지 → [~+leftmost] 왼쪽 부채꼴 추종
         self.ar_advance_sec  = rospy.get_param("~ar_advance_sec", 0.75)  # 차선 따라 전진
         self.ar_stop_sec     = rospy.get_param("~ar_stop_sec", 0.0)      # 1차 정지(0=없음)
-        self.ar_leftmost_sec = rospy.get_param("~ar_leftmost_sec", 1.75) # 왼쪽 부채꼴 추종+ROI확대
+        self.ar_leftmost_sec = rospy.get_param("~ar_leftmost_sec", 2.0)  # 왼쪽 부채꼴 추종+ROI확대
         self.ar_stop2_sec    = rospy.get_param("~ar_stop2_sec", 0.0)     # 2차 정지(0=없음)
-        self.ar_rightmost_sec = rospy.get_param("~ar_rightmost_sec", 0.8)  # 오른쪽 부채꼴 추종
+        self.ar_rightmost_sec = rospy.get_param("~ar_rightmost_sec", 0.4)  # 오른쪽 부채꼴 추종
         self.ar_stop3_sec     = rospy.get_param("~ar_stop3_sec", 0.0)      # 3차 정지(0=없음)
         self.ar_center_sec    = rospy.get_param("~ar_center_sec", 8.0)     # 중앙 최근접 부채꼴 추종
         self.ar_center_gain_scale = rospy.get_param("~ar_center_gain_scale", 1.1)  # 중앙 추종 게인 배율

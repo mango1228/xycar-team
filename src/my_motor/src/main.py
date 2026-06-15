@@ -163,11 +163,10 @@ class XycarController:
                 mode = "AR_STOP2"
                 self.xycar_driver.drive(0, 0)
             elif el is not None and el < t_right:
-                # [t_stop2~t_right] 재출발: 15도 이상 부채꼴 중 중앙 최근접 추종 (구 오른쪽 추종 구간)
-                mode = "AR_CENTER1"
+                # [t_stop2~t_right] 15도 이상 부채꼴 중 가장 오른쪽 추종 (게인 ×1)
+                mode = "AR_RIGHTMOST"
                 if gaps:
-                    # 추종 게인 일반(×1)
-                    steer_c, _ = self.lane_follower.correct_lane_centermost(
+                    steer_c, _ = self.lane_follower.correct_lane_rightmost(
                         gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
                 else:
                     steer_c = center

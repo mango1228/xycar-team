@@ -101,9 +101,9 @@
          ROI 전방×1.5는 왼쪽~중앙 추종 전 구간에 적용 -->
     <param name="ar_advance_sec"   value="0.75" />
     <param name="ar_stop_sec"      value="0.0" />
-    <param name="ar_leftmost_sec"  value="1.75" />
+    <param name="ar_leftmost_sec"  value="2.0" />
     <param name="ar_stop2_sec"     value="0.0" />
-    <param name="ar_rightmost_sec" value="0.8" />
+    <param name="ar_rightmost_sec" value="0.4" />
     <param name="ar_stop3_sec"     value="0.0" />
     <param name="ar_center_sec"    value="8.0" />
     <param name="ar_stop4_sec"     value="1.0" />
