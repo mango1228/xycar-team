@@ -103,7 +103,7 @@
     <param name="ar_stop_sec"      value="0.0" />
     <param name="ar_leftmost_sec"  value="1.75" />
     <param name="ar_stop2_sec"     value="0.0" />
-    <param name="ar_rightmost_sec" value="0.6" />
+    <param name="ar_rightmost_sec" value="0.8" />
     <param name="ar_stop3_sec"     value="0.0" />
     <param name="ar_center_sec"    value="9.0" />
     <param name="ar_stop4_sec"     value="0.0" />
