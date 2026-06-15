@@ -132,8 +132,8 @@
     <param name="ar_roi_forward_scale_left"   value="2.0" />
     <!-- 중앙 추종 전방 y_min = -0.45 * 1.889 ≈ -0.85 -->
     <param name="ar_roi_forward_scale_center" value="1.889" />
-    <!-- 중앙추종 끝나고 1.5초 동안 전방 y_min = -0.45 * 0.7778 ≈ -0.35 (축소) -->
-    <param name="ar_after_center_sec" value="1.5" />
+    <!-- 중앙추종 끝나고 2.3초 동안 전방 y_min = -0.45 * 0.7778 ≈ -0.35 (축소) -->
+    <param name="ar_after_center_sec" value="2.3" />
     <param name="ar_roi_forward_scale_after" value="0.7778" />
     <!-- 왼쪽 부채꼴 추종 구간 추종 계수 배율 -->
     <param name="ar_leftmost_gain_scale" value="2.0" />
