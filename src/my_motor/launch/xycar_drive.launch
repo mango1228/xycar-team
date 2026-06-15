@@ -96,14 +96,14 @@
     <param name="ar_roi_right"  value="640" />
     <!-- AR 인정 최대거리(m): 99=ROI만 적용. 가까울 때만 반응하려면 0.5 등 -->
     <param name="ar_max_dist" value="99.0" />
-    <!-- AR 시퀀스: 전진1s -> 1차정지1s -> 왼쪽부채꼴+ROI확대2s -> 2차정지1s
-         -> 오른쪽부채꼴2s -> 3차정지1s -> 중앙최근접부채꼴10s -> 출발 -->
+    <!-- AR 시퀀스(중간 정지 제거): 전진1s -> 왼쪽부채꼴+ROI확대2s
+         -> 오른쪽부채꼴2s -> 중앙최근접부채꼴10s -> 출발 -->
     <param name="ar_advance_sec"   value="1.0" />
-    <param name="ar_stop_sec"      value="1.0" />
+    <param name="ar_stop_sec"      value="0.0" />
     <param name="ar_leftmost_sec"  value="2.0" />
-    <param name="ar_stop2_sec"     value="1.0" />
+    <param name="ar_stop2_sec"     value="0.0" />
     <param name="ar_rightmost_sec" value="2.0" />
-    <param name="ar_stop3_sec"     value="1.0" />
+    <param name="ar_stop3_sec"     value="0.0" />
     <param name="ar_center_sec"    value="10.0" />
     <!-- 왼쪽 부채꼴 후보 최소 각폭(도) -->
     <param name="ar_leftmost_min_deg" value="15.0" />
