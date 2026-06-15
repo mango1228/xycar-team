@@ -104,7 +104,7 @@ class XycarController:
                 mode = "LIDAR_ONLY"
                 print("AR detected")
 
-            if self.ar_prev and not ar_now:
+            elif self.ar_prev and not ar_now:
                 # ★ 보였다 → 사라진 바로 그 순간: 여기서 N초 타이머 시작
                 self.ar_hold_until = now + self.ar_hold_sec
                 if lidar_c is not None:
@@ -112,7 +112,7 @@ class XycarController:
                 mode = "LIDAR_HOLD"
                 print("Now follow LIDAR")
             
-            if now < self.ar_hold_until:
+            elif now < self.ar_hold_until:
                 # 사라진 뒤 유지 시간 안: 계속 라이다 모드
                 if lidar_c is not None:
                     center = lidar_c
