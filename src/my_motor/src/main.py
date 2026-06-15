@@ -177,9 +177,10 @@ class XycarController:
                 # [t_stop3~t_center] 중앙 최근접 15도 이상 부채꼴 추종 (10초)
                 mode = "AR_CENTER"
                 if gaps:
-                    # 중앙 추종은 일반 게인(×1) 사용 (왼쪽/오른쪽만 ×2)
+                    # 중앙 추종은 게인 ×ar_center_gain_scale(기본 0.6)
                     steer_c, _ = self.lane_follower.correct_lane_centermost(
-                        gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
+                        gaps, self.lidar_processor.roi_ang_center,
+                        self.cfg.ar_leftmost_min_deg, self.cfg.ar_center_gain_scale)
                 else:
                     steer_c = center
                 angle = self.pid_controller.compute_pid_angle(steer_c)

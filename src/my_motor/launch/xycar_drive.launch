@@ -103,9 +103,11 @@
     <param name="ar_stop_sec"      value="1.0" />
     <param name="ar_leftmost_sec"  value="1.75" />
     <param name="ar_stop2_sec"     value="1.0" />
-    <param name="ar_rightmost_sec" value="1.0" />
+    <param name="ar_rightmost_sec" value="0.5" />
     <param name="ar_stop3_sec"     value="1.0" />
     <param name="ar_center_sec"    value="10.0" />
+    <!-- 중앙 추종 게인 배율 (오른쪽은 x1, 중앙은 x0.6) -->
+    <param name="ar_center_gain_scale" value="0.6" />
     <!-- 왼쪽 부채꼴 후보 최소 각폭(도) -->
     <param name="ar_leftmost_min_deg" value="15.0" />
     <!-- 추종 구간 ROI: 좌우폭 그대로(×1) / 전방 왼쪽추종 ×2, 오른쪽·중앙추종 ×1.5 -->
