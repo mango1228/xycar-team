@@ -92,7 +92,7 @@ class Config:
         # 전방(y_min) 배율: 왼쪽 추종=_left(×2), 오른쪽 추종=기본(×1.5), 중앙 추종=_center(×0.6 축소)
         self.ar_roi_forward_scale = rospy.get_param("~ar_roi_forward_scale", 1.5)
         self.ar_roi_forward_scale_left = rospy.get_param("~ar_roi_forward_scale_left", 2.0)
-        self.ar_roi_forward_scale_center = rospy.get_param("~ar_roi_forward_scale_center", 1.0)
+        self.ar_roi_forward_scale_center = rospy.get_param("~ar_roi_forward_scale_center", 1.889)  # y_min -0.45*1.889 ≈ -0.85
         # AR 인식 후 이 시간(초) 동안 특별구역(횡단보도/빗금) 정지 차단
         self.ar_special_block_sec = rospy.get_param("~ar_special_block_sec", 20.0)
         # AR 인식 후 이 시간(초) 동안 카메라 추종점 미사용, 라이다 추종점만 사용

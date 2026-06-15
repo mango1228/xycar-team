@@ -115,7 +115,8 @@
     <param name="ar_roi_scale"                value="1.0" />
     <param name="ar_roi_forward_scale"        value="1.5" />
     <param name="ar_roi_forward_scale_left"   value="2.0" />
-    <param name="ar_roi_forward_scale_center" value="1.0" />
+    <!-- 중앙 추종 전방 y_min = -0.45 * 1.889 ≈ -0.85 -->
+    <param name="ar_roi_forward_scale_center" value="1.889" />
     <!-- 왼쪽 부채꼴 추종 구간 추종 계수 배율 -->
     <param name="ar_leftmost_gain_scale" value="2.0" />
     <!-- AR 인식 후 특별구역(횡단보도/빗금) 정지 차단 시간(초) -->
