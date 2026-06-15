@@ -96,10 +96,10 @@
     <param name="ar_roi_right"  value="640" />
     <!-- AR 인정 최대거리(m): 99=ROI만 적용. 가까울 때만 반응하려면 0.5 등 -->
     <param name="ar_max_dist" value="99.0" />
-    <!-- AR 태그 인식 후 시퀀스: 차선전진 1s -> 정지 1s -> 왼쪽부채꼴 추종 3s -->
-    <param name="ar_advance_sec"  value="1.0" />
+    <!-- AR 태그 인식 후 시퀀스: 차선전진 0.5s -> 정지 1s -> 왼쪽부채꼴 추종+ROI확대 2s -->
+    <param name="ar_advance_sec"  value="0.5" />
     <param name="ar_stop_sec"     value="1.0" />
-    <param name="ar_leftmost_sec" value="3.0" />
+    <param name="ar_leftmost_sec" value="2.0" />
     <!-- 왼쪽 부채꼴 후보 최소 각폭(도) -->
     <param name="ar_leftmost_min_deg" value="15.0" />
     <!-- 왼쪽 부채꼴 추종 구간([2~5s])에만 적용: 라이다 ROI 좌우폭 ×2, 전방 ×1.5 -->
