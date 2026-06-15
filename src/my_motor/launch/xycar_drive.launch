@@ -105,17 +105,17 @@
     <param name="ar_stop2_sec"     value="1.0" />
     <param name="ar_rightmost_sec" value="1.0" />
     <param name="ar_stop3_sec"     value="1.0" />
-    <param name="ar_center_sec"    value="10.0" />
+    <param name="ar_center_sec"    value="9.0" />
     <param name="ar_stop4_sec"     value="1.0" />
-    <!-- 중앙 추종 게인 배율 (오른쪽은 x1, 중앙은 x1.2) -->
-    <param name="ar_center_gain_scale" value="1.2" />
+    <!-- 중앙 추종 게인 배율 (오른쪽은 x1, 중앙은 x1.4) -->
+    <param name="ar_center_gain_scale" value="1.4" />
     <!-- 왼쪽 부채꼴 후보 최소 각폭(도) -->
     <param name="ar_leftmost_min_deg" value="15.0" />
     <!-- 추종 구간 ROI: 좌우폭 그대로(×1) / 전방 왼쪽 ×2, 오른쪽 ×1.5, 중앙 ×0.6(축소) -->
     <param name="ar_roi_scale"                value="1.0" />
     <param name="ar_roi_forward_scale"        value="1.5" />
     <param name="ar_roi_forward_scale_left"   value="2.0" />
-    <param name="ar_roi_forward_scale_center" value="0.6" />
+    <param name="ar_roi_forward_scale_center" value="0.72" />
     <!-- 왼쪽 부채꼴 추종 구간 추종 계수 배율 -->
     <param name="ar_leftmost_gain_scale" value="2.0" />
     <!-- AR 인식 후 특별구역(횡단보도/빗금) 정지 차단 시간(초) -->
