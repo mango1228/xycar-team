@@ -75,9 +75,10 @@ class Config:
         self.ar_roi_right  = int(rospy.get_param("~ar_roi_right", 640))
         # ===== AR 태그 인식 후 시퀀스 (순차 단계) =====
         # [0~adv] 차선추종 전진 → [adv~adv+stop] 정지 → [~+leftmost] 왼쪽 부채꼴 추종
-        self.ar_advance_sec  = rospy.get_param("~ar_advance_sec", 0.5)   # 차선 따라 전진
-        self.ar_stop_sec     = rospy.get_param("~ar_stop_sec", 1.0)      # 정지
+        self.ar_advance_sec  = rospy.get_param("~ar_advance_sec", 1.0)   # 차선 따라 전진
+        self.ar_stop_sec     = rospy.get_param("~ar_stop_sec", 1.0)      # 1차 정지
         self.ar_leftmost_sec = rospy.get_param("~ar_leftmost_sec", 2.0)  # 왼쪽 부채꼴 추종+ROI확대
+        self.ar_stop2_sec    = rospy.get_param("~ar_stop2_sec", 1.0)     # 2차 정지(부채꼴 후), 끝나면 ROI 복구·출발
         # 왼쪽 부채꼴 후보 최소 각폭(도). 이 이상 벌어진 부채꼴 중 가장 왼쪽 선택
         self.ar_leftmost_min_deg = rospy.get_param("~ar_leftmost_min_deg", 15.0)
         # 왼쪽 부채꼴 추종 구간([adv+stop ~ +leftmost]) 동안 라이다 ROI 배율

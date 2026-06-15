@@ -102,12 +102,14 @@ class XycarController:
             el = (now - self.ar_t0) if self.ar_t0 is not None else None
 
             # ===== 단계별 주행 =====
-            t_adv  = self.cfg.ar_advance_sec
-            t_stop = t_adv + self.cfg.ar_stop_sec
-            t_left = t_stop + self.cfg.ar_leftmost_sec
+            t_adv   = self.cfg.ar_advance_sec
+            t_stop  = t_adv + self.cfg.ar_stop_sec
+            t_left  = t_stop + self.cfg.ar_leftmost_sec
+            t_stop2 = t_left + self.cfg.ar_stop2_sec
 
-            # 왼쪽 부채꼴 구간([t_stop~t_left]) 동안만 라이다 ROI 좌우 폭 확대, 그 외엔 원복
-            want_boost = (el is not None and t_stop <= el < t_left)
+            # ROI 확대 유지: 왼쪽 부채꼴([t_stop~t_left]) + 2차 정지([t_left~t_stop2])
+            # → 2차 정지가 끝나는 t_stop2 에 원래 ROI 복구(출발 직전)
+            want_boost = (el is not None and t_stop <= el < t_stop2)
             if want_boost and not self.ar_roi_boosted:
                 self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
                                              self.base_lidar_roi_y_min * self.cfg.ar_roi_forward_scale,
@@ -150,6 +152,10 @@ class XycarController:
                     steer_c = center
                 angle = self.pid_controller.compute_pid_angle(steer_c)
                 self.xycar_driver.drive(angle, self.cfg.speed)
+            elif el is not None and el < t_stop2:
+                # [t_left~t_stop2] 2차 정지 (ROI는 t_stop2에 복구)
+                mode = "AR_STOP2"
+                self.xycar_driver.drive(0, 0)
             elif lidar_only:
                 # [t_left~ar_lidar_only_sec] 카메라 추종점 미사용, 라이다 추종점만
                 mode = "AR_LIDAR"
