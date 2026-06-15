@@ -103,8 +103,8 @@
     <param name="ar_stop2_sec"    value="1.0" />
     <!-- 왼쪽 부채꼴 후보 최소 각폭(도) -->
     <param name="ar_leftmost_min_deg" value="15.0" />
-    <!-- 왼쪽 부채꼴 추종 구간에만 적용: 라이다 ROI 좌우폭 ×2, 전방 ×1.5 -->
-    <param name="ar_roi_scale"         value="2.0" />
+    <!-- 왼쪽 부채꼴 추종 구간에만 적용: 라이다 ROI 좌우폭 그대로(×1), 전방 ×1.5 -->
+    <param name="ar_roi_scale"         value="1.0" />
     <param name="ar_roi_forward_scale" value="1.5" />
     <!-- 왼쪽 부채꼴 추종 구간 추종 계수 배율 -->
     <param name="ar_leftmost_gain_scale" value="2.0" />
