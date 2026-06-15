@@ -100,17 +100,17 @@
          -> 오른쪽부채꼴1s(게인x2) -> 3차정지1s -> 중앙최근접부채꼴10s(일반게인) -> 출발
          ROI 전방×1.5는 왼쪽~중앙 추종 전 구간에 적용 -->
     <param name="ar_advance_sec"   value="0.75" />
-    <param name="ar_stop_sec"      value="0.0" />
+    <param name="ar_stop_sec"      value="1.0" />
     <param name="ar_leftmost_sec"  value="2.0" />
-    <param name="ar_stop2_sec"     value="0.0" />
+    <param name="ar_stop2_sec"     value="1.0" />
     <param name="ar_rightmost_sec" value="0.4" />
-    <param name="ar_stop3_sec"     value="0.0" />
+    <param name="ar_stop3_sec"     value="1.0" />
     <param name="ar_center_sec"    value="8.5" />
     <param name="ar_stop4_sec"     value="1.0" />
     <!-- 중앙 추종 게인 배율 (오른쪽은 x1, 중앙은 x1.1) -->
     <param name="ar_center_gain_scale" value="1.1" />
     <!-- 왼쪽 부채꼴 후보 최소 각폭(도) -->
-    <param name="ar_leftmost_min_deg" value="15.0" />
+    <param name="ar_leftmost_min_deg" value="25.0" />
     <!-- 추종 구간 ROI: 좌우폭 그대로(×1) / 전방 왼쪽 ×2, 오른쪽 ×1.5, 중앙 ×0.6(축소) -->
     <param name="ar_roi_scale"                value="1.0" />
     <param name="ar_roi_forward_scale"        value="1.5" />
