@@ -35,9 +35,14 @@ class XycarController:
         self.lane_follower = LaneFollower(self.cfg)
         self.special_zone_controller = SpecialZoneController(self.cfg, self.pid_controller)
         self.ar_tag_detector = ARtagDetector(self.cfg)
-        # AR 태그 ROI 진입 시 3초 정지용 상태
-        self.ar_stop_until = 0.0   # 이 시각까지 정지 유지
-        self.ar_armed = True       # True일 때만 새 정지 트리거 (태그 사라질 때까지 재트리거 방지)
+        # AR 태그 인식 후 시퀀스 상태
+        self.ar_t0 = None          # 시퀀스 시작 시각 (None=비활성)
+        self.ar_armed = True       # True일 때만 새 시퀀스 트리거 (태그 사라질 때까지 재트리거 방지)
+        self.ar_roi_boosted = False
+        # 기본 라이다 ROI 백업 (시퀀스 종료 후 복귀용)
+        self.base_lidar_roi_x     = self.cfg.lidar_roi_x
+        self.base_lidar_roi_y_min = self.cfg.lidar_roi_y_min
+        self.base_lidar_roi_y_max = self.cfg.lidar_roi_y_max
 
 
         rospy.on_shutdown(self.shutdown)  # 안전 정지 (콜백 등록: 괄호 없이 함수 참조)
@@ -83,24 +88,60 @@ class XycarController:
 
             now = time.time()
 
-            # ===== AR 태그 ROI 진입 → ar_stop_sec 동안 정지 (1회 트리거) =====
+            # ===== AR 태그 인식 시퀀스 트리거 (1회) =====
             ar_in = (self.ar_tag_detector.detected and
                      self.ar_tag_detector.distance < self.cfg.ar_max_dist)
             if self.ar_armed and ar_in:
-                self.ar_stop_until = now + self.cfg.ar_stop_sec
+                self.ar_t0 = now
                 self.ar_armed = False
-                print("AR detected (id=%s) -> %.1fs stop"
-                      % (self.ar_tag_detector.marker_id, self.cfg.ar_stop_sec))
-            # 태그가 시야에서 사라지고 정지도 끝나면 다시 트리거 가능
-            if not ar_in and now >= self.ar_stop_until:
+                # 라이다 ROI 좌우 폭 확대 (×ar_roi_scale)
+                self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
+                                             self.base_lidar_roi_y_min,
+                                             self.base_lidar_roi_y_max)
+                self.ar_roi_boosted = True
+                print("AR detected (id=%s) -> sequence start"
+                      % self.ar_tag_detector.marker_id)
+
+            el = (now - self.ar_t0) if self.ar_t0 is not None else None
+
+            # ROI 부스트 시간 종료 → 원래 ROI 복귀
+            if self.ar_roi_boosted and el is not None and el >= self.cfg.ar_roi_boost_sec:
+                self.lidar_processor.set_roi(self.base_lidar_roi_x,
+                                             self.base_lidar_roi_y_min,
+                                             self.base_lidar_roi_y_max)
+                self.ar_roi_boosted = False
+
+            # 시퀀스/부스트 모두 끝나고 태그도 사라지면 재무장
+            if self.ar_t0 is not None and el >= self.cfg.ar_roi_boost_sec and not ar_in:
+                self.ar_t0 = None
                 self.ar_armed = True
 
-            if now < self.ar_stop_until:
-                # AR 정지 구간: 무조건 멈춤 (특수구역/차선주행보다 우선)
+            # ===== 단계별 주행 =====
+            t_adv  = self.cfg.ar_advance_sec
+            t_stop = t_adv + self.cfg.ar_stop_sec
+            t_left = t_stop + self.cfg.ar_leftmost_sec
+
+            if el is not None and el < t_adv:
+                # [0~adv] 차선 따라 전진
+                mode = "AR_ADVANCE"
+                angle = self.pid_controller.compute_pid_angle(center)
+                self.xycar_driver.drive(angle, self.cfg.speed)
+            elif el is not None and el < t_stop:
+                # [adv~adv+stop] 정지
                 mode = "AR_STOP"
                 self.xycar_driver.drive(0, 0)
+            elif el is not None and el < t_left:
+                # [~+leftmost] 15도 이상 부채꼴 중 가장 왼쪽 추종
+                mode = "AR_LEFTMOST"
+                if gaps:
+                    steer_c, _ = self.lane_follower.correct_lane_leftmost(
+                        gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
+                else:
+                    steer_c = center
+                angle = self.pid_controller.compute_pid_angle(steer_c)
+                self.xycar_driver.drive(angle, self.cfg.speed)
             elif not self.cfg.enable_special_zone:
-                # ===== 기존 차선주행 경로 (특수구역 off) =====
+                # ===== 일반 차선주행 (특수구역 off) =====
                 angle = self.pid_controller.compute_pid_angle(center)
                 self.xycar_driver.drive(angle, self.cfg.speed)
             else:

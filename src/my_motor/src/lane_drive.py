@@ -179,6 +179,16 @@ class LidarProcessor:
     def lidar_callback(self, data):
         self.lidar_scan = data
 
+    def set_roi(self, x, y_min, y_max):
+        """라이다 ROI를 런타임에 변경. 각도 경계도 함께 재계산해야
+        get_gaps / 원뿔 마커가 새 ROI를 따라간다."""
+        self.cfg.lidar_roi_x     = x
+        self.cfg.lidar_roi_y_min = y_min
+        self.cfg.lidar_roi_y_max = y_max
+        self.roi_ang_min = math.atan2(y_max, -x)
+        self.roi_ang_max = math.atan2(y_max,  x)
+        self.roi_ang_center = (self.roi_ang_min + self.roi_ang_max) / 2.0
+
     def get_roi_data(self, scan):
         """LaserScan -> ROI 박스 안 포인트 [(x, y, angle)] 반환.
         laser_frame 표준 좌표 (x=cos*r, y=sin*r). scan이 None이면 []."""
@@ -317,6 +327,20 @@ class LaneFollower:
         self.bisector = (largest[0] + largest[1]) / 2.0
         # ROI_ANG_CENTER - bisector: laser_frame에서 car left/right 방향 보정
         # bisector > CENTER(=-90°) → car's left → negative offset → steer left
+        dev = roi_ang_center - self.bisector
+        self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * self.cfg.lidar_center_gain)))
+        return self.lidar_c, self.bisector
+
+    def correct_lane_leftmost(self, gaps, roi_ang_center, min_deg=15.0):
+        """min_deg 이상 벌어진 부채꼴 중 '가장 왼쪽'(bisector가 가장 큰=차량 좌측) 것을 추종.
+        조건 만족하는 부채꼴이 없으면 기존 최대 부채꼴 방식으로 폴백.
+        만약 실차에서 좌우가 반대로 가면 max → min 으로 바꿀 것."""
+        min_rad = math.radians(min_deg)
+        wide = [g for g in gaps if (g[1] - g[0]) >= min_rad]
+        if not wide:
+            return self.correct_lane(gaps, roi_ang_center)
+        leftmost = max(wide, key=lambda g: (g[0] + g[1]) / 2.0)
+        self.bisector = (leftmost[0] + leftmost[1]) / 2.0
         dev = roi_ang_center - self.bisector
         self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * self.cfg.lidar_center_gain)))
         return self.lidar_c, self.bisector
