@@ -82,6 +82,21 @@
 
     <param name="center_margin" value="90" />
 
+    <!-- 적응형 차선 복구(어두울 때 강함): 한쪽 차선 놓치면 last_good 기준 로컬 윈도우에
+         CLAHE 대비보정 + 적응형 Canny + 낮춘 Hough로 재검출. ar 브랜치에서 이식 -->
+    <param name="center_jump_threshold"     value="80" />
+    <param name="lane_width_jump_threshold" value="100" />
+    <param name="recovery_window_px"          value="90" />
+    <param name="recovery_pos_gate_px"        value="100" />
+    <param name="recovery_lane_width_gate_px" value="130" />
+    <param name="recovery_clahe_clip"   value="2.0" />
+    <param name="recovery_canny_sigma"  value="0.33" />
+    <param name="recovery_canny_low_min"  value="15" />
+    <param name="recovery_canny_high_min" value="45" />
+    <param name="recovery_canny_high_max" value="180" />
+    <param name="v3_mismatch_center_gate_px"     value="70" />
+    <param name="v3_mismatch_lane_width_gate_px" value="90" />
+
     <param name="show_debug" value="true"/>
 
     <!-- 특수구역 정지: 검출은 special_zone_detector 노드, 여기선 상태머신만.
