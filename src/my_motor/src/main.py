@@ -94,32 +94,33 @@ class XycarController:
             if self.ar_armed and ar_in:
                 self.ar_t0 = now
                 self.ar_armed = False
-                # 라이다 ROI 좌우 폭 확대 (×ar_roi_scale)
-                self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
-                                             self.base_lidar_roi_y_min,
-                                             self.base_lidar_roi_y_max)
-                self.ar_roi_boosted = True
                 print("AR detected (id=%s) -> sequence start"
                       % self.ar_tag_detector.marker_id)
 
             el = (now - self.ar_t0) if self.ar_t0 is not None else None
 
-            # ROI 부스트 시간 종료 → 원래 ROI 복귀
-            if self.ar_roi_boosted and el is not None and el >= self.cfg.ar_roi_boost_sec:
+            # ===== 단계별 주행 =====
+            t_adv  = self.cfg.ar_advance_sec
+            t_stop = t_adv + self.cfg.ar_stop_sec
+            t_left = t_stop + self.cfg.ar_leftmost_sec
+
+            # 왼쪽 부채꼴 구간([t_stop~t_left]) 동안만 라이다 ROI 좌우 폭 확대, 그 외엔 원복
+            want_boost = (el is not None and t_stop <= el < t_left)
+            if want_boost and not self.ar_roi_boosted:
+                self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
+                                             self.base_lidar_roi_y_min,
+                                             self.base_lidar_roi_y_max)
+                self.ar_roi_boosted = True
+            elif not want_boost and self.ar_roi_boosted:
                 self.lidar_processor.set_roi(self.base_lidar_roi_x,
                                              self.base_lidar_roi_y_min,
                                              self.base_lidar_roi_y_max)
                 self.ar_roi_boosted = False
 
-            # 시퀀스/부스트 모두 끝나고 태그도 사라지면 재무장
-            if self.ar_t0 is not None and el >= self.cfg.ar_roi_boost_sec and not ar_in:
+            # 시퀀스 끝나고 태그도 사라지면 재무장
+            if self.ar_t0 is not None and el >= t_left and not ar_in:
                 self.ar_t0 = None
                 self.ar_armed = True
-
-            # ===== 단계별 주행 =====
-            t_adv  = self.cfg.ar_advance_sec
-            t_stop = t_adv + self.cfg.ar_stop_sec
-            t_left = t_stop + self.cfg.ar_leftmost_sec
 
             if el is not None and el < t_adv:
                 # [0~adv] 차선 따라 전진

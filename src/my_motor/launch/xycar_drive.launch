@@ -102,9 +102,8 @@
     <param name="ar_leftmost_sec" value="3.0" />
     <!-- 왼쪽 부채꼴 후보 최소 각폭(도) -->
     <param name="ar_leftmost_min_deg" value="15.0" />
-    <!-- AR 인식 후 라이다 ROI 좌우폭 배율 / 유지시간(초) -->
-    <param name="ar_roi_scale"     value="2.0" />
-    <param name="ar_roi_boost_sec" value="10.0" />
+    <!-- 왼쪽 부채꼴 추종 구간([2~5s])에만 적용되는 라이다 ROI 좌우폭 배율 -->
+    <param name="ar_roi_scale" value="2.0" />
 
     <param name="cross_confirm_frames" value="1" />
     <param name="crosswalk_stop_sec" value="10.0" />
