@@ -106,6 +106,9 @@ class XycarController:
             t_stop  = t_adv + self.cfg.ar_stop_sec
             t_left  = t_stop + self.cfg.ar_leftmost_sec
             t_stop2 = t_left + self.cfg.ar_stop2_sec
+            t_right = t_stop2 + self.cfg.ar_rightmost_sec
+            t_stop3 = t_right + self.cfg.ar_stop3_sec
+            t_center = t_stop3 + self.cfg.ar_center_sec
 
             # ROI 확대는 왼쪽 부채꼴 구간([t_stop~t_left])과 동시에 적용, 부채꼴 끝나면 복구
             want_boost = (el is not None and t_stop <= el < t_left)
@@ -152,9 +155,33 @@ class XycarController:
                 angle = self.pid_controller.compute_pid_angle(steer_c)
                 self.xycar_driver.drive(angle, self.cfg.speed)
             elif el is not None and el < t_stop2:
-                # [t_left~t_stop2] 2차 정지 (ROI는 t_stop2에 복구)
+                # [t_left~t_stop2] 2차 정지
                 mode = "AR_STOP2"
                 self.xycar_driver.drive(0, 0)
+            elif el is not None and el < t_right:
+                # [t_stop2~t_right] 재출발: 15도 이상 부채꼴 중 가장 오른쪽 추종
+                mode = "AR_RIGHTMOST"
+                if gaps:
+                    steer_c, _ = self.lane_follower.correct_lane_rightmost(
+                        gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
+                else:
+                    steer_c = center
+                angle = self.pid_controller.compute_pid_angle(steer_c)
+                self.xycar_driver.drive(angle, self.cfg.speed)
+            elif el is not None and el < t_stop3:
+                # [t_right~t_stop3] 3차 정지
+                mode = "AR_STOP3"
+                self.xycar_driver.drive(0, 0)
+            elif el is not None and el < t_center:
+                # [t_stop3~t_center] 중앙 최근접 15도 이상 부채꼴 추종 (10초)
+                mode = "AR_CENTER"
+                if gaps:
+                    steer_c, _ = self.lane_follower.correct_lane_centermost(
+                        gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
+                else:
+                    steer_c = center
+                angle = self.pid_controller.compute_pid_angle(steer_c)
+                self.xycar_driver.drive(angle, self.cfg.speed)
             elif lidar_only:
                 # [t_left~ar_lidar_only_sec] 카메라 추종점 미사용, 라이다 추종점만
                 mode = "AR_LIDAR"

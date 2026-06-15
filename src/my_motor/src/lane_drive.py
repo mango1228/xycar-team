@@ -346,6 +346,34 @@ class LaneFollower:
         gain = self.cfg.lidar_center_gain * gain_scale
         self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * gain)))
         return self.lidar_c, self.bisector
+
+    def correct_lane_rightmost(self, gaps, roi_ang_center, min_deg=15.0, gain_scale=1.0):
+        """min_deg 이상 벌어진 부채꼴 중 '가장 오른쪽'(bisector가 가장 큰=차량 우측) 것을 추종.
+        왼쪽(min)의 거울버전. 조건 만족 부채꼴 없으면 기존 최대 부채꼴로 폴백."""
+        min_rad = math.radians(min_deg)
+        wide = [g for g in gaps if (g[1] - g[0]) >= min_rad]
+        if not wide:
+            return self.correct_lane(gaps, roi_ang_center)
+        rightmost = max(wide, key=lambda g: (g[0] + g[1]) / 2.0)
+        self.bisector = (rightmost[0] + rightmost[1]) / 2.0
+        dev = roi_ang_center - self.bisector
+        gain = self.cfg.lidar_center_gain * gain_scale
+        self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * gain)))
+        return self.lidar_c, self.bisector
+
+    def correct_lane_centermost(self, gaps, roi_ang_center, min_deg=15.0, gain_scale=1.0):
+        """min_deg 이상 벌어진 부채꼴 중 중심(roi_ang_center)에 가장 가까운 것을 추종.
+        조건 만족 부채꼴 없으면 기존 최대 부채꼴로 폴백."""
+        min_rad = math.radians(min_deg)
+        wide = [g for g in gaps if (g[1] - g[0]) >= min_rad]
+        if not wide:
+            return self.correct_lane(gaps, roi_ang_center)
+        centermost = min(wide, key=lambda g: abs((g[0] + g[1]) / 2.0 - roi_ang_center))
+        self.bisector = (centermost[0] + centermost[1]) / 2.0
+        dev = roi_ang_center - self.bisector
+        gain = self.cfg.lidar_center_gain * gain_scale
+        self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * gain)))
+        return self.lidar_c, self.bisector
     
 
 class ARtagDetector:
