@@ -118,6 +118,9 @@ class XycarController:
                 desired_f = self.cfg.ar_roi_forward_scale
             elif el is not None and t_stop3 <= el < t_center:
                 desired_f = self.cfg.ar_roi_forward_scale_center
+            elif el is not None and t_center <= el < t_center + self.cfg.ar_after_center_sec:
+                # 중앙추종 끝나고 ar_after_center_sec 동안 전방 축소 (y_min -0.45 -> -0.25)
+                desired_f = self.cfg.ar_roi_forward_scale_after
             else:
                 desired_f = 1.0
             if desired_f != self.ar_roi_cur_fscale:
