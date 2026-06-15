@@ -136,7 +136,7 @@ class Config:
         self.stripe_max_gap         = rospy.get_param("~stripe_max_gap", 5)
         self.hatch_confirm_frames  = rospy.get_param("~hatch_confirm_frames", 2)
         # 빗금 흐름: 감지 → 차선 따라 hatch_advance_sec 동안 전진 → 영구정지
-        self.hatch_advance_sec     = rospy.get_param("~hatch_advance_sec", 1.5)
+        self.hatch_advance_sec     = rospy.get_param("~hatch_advance_sec", 1.65)
         # (미사용) 옛 검증 흐름 파라미터 — 호환 위해 남겨둠
         self.hatch_verify_sec      = rospy.get_param("~hatch_verify_sec", 1.0)
         self.hatch_lost_sec        = rospy.get_param("~hatch_lost_sec", 999.0)
