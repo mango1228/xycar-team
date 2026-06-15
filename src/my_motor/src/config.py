@@ -84,6 +84,12 @@ class Config:
         # ar_roi_scale: 좌우 폭(x) 배율 / ar_roi_forward_scale: 전방 먼 경계(y_min) 배율
         self.ar_roi_scale = rospy.get_param("~ar_roi_scale", 2.0)
         self.ar_roi_forward_scale = rospy.get_param("~ar_roi_forward_scale", 1.5)
+        # AR 인식 후 이 시간(초) 동안 특별구역(횡단보도/빗금) 정지 차단
+        self.ar_special_block_sec = rospy.get_param("~ar_special_block_sec", 20.0)
+        # AR 인식 후 이 시간(초) 동안 카메라 추종점 미사용, 라이다 추종점만 사용
+        self.ar_lidar_only_sec = rospy.get_param("~ar_lidar_only_sec", 10.0)
+        # 왼쪽 부채꼴 추종 구간 동안 추종 계수(lidar_center_gain) 배율
+        self.ar_leftmost_gain_scale = rospy.get_param("~ar_leftmost_gain_scale", 2.0)
 
         # 횡단보도 감지
         self.cross_white_thresh   = rospy.get_param("~cross_white_thresh", 180)

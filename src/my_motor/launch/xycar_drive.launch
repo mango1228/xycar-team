@@ -102,9 +102,15 @@
     <param name="ar_leftmost_sec" value="2.0" />
     <!-- 왼쪽 부채꼴 후보 최소 각폭(도) -->
     <param name="ar_leftmost_min_deg" value="15.0" />
-    <!-- 왼쪽 부채꼴 추종 구간([2~5s])에만 적용: 라이다 ROI 좌우폭 ×2, 전방 ×1.5 -->
+    <!-- 왼쪽 부채꼴 추종 구간에만 적용: 라이다 ROI 좌우폭 ×2, 전방 ×1.5 -->
     <param name="ar_roi_scale"         value="2.0" />
     <param name="ar_roi_forward_scale" value="1.5" />
+    <!-- 왼쪽 부채꼴 추종 구간 추종 계수 배율 -->
+    <param name="ar_leftmost_gain_scale" value="2.0" />
+    <!-- AR 인식 후 특별구역(횡단보도/빗금) 정지 차단 시간(초) -->
+    <param name="ar_special_block_sec" value="20.0" />
+    <!-- AR 인식 후 카메라 추종점 미사용(라이다 추종점만) 시간(초) -->
+    <param name="ar_lidar_only_sec" value="10.0" />
 
     <param name="cross_confirm_frames" value="1" />
     <param name="crosswalk_stop_sec" value="10.0" />

@@ -73,7 +73,9 @@ class XycarController:
 
             if gaps:
                 lidar_c, bisector = self.lane_follower.correct_lane(gaps, self.lidar_processor.roi_ang_center)
-                
+
+            lidar_follow = lidar_c   # 카메라 클램프 전 순수 라이다 추종점 (AR 라이다전용 구간용)
+
             self.lidar_processor.publish_roi_markers(roi_data, gaps, bisector, self.lidar_processor.lidar_scan)
             
             # 라이다 보정: 차선 경계 안으로 클램프 (차선 바깥 조향 방지)
@@ -117,38 +119,52 @@ class XycarController:
                                              self.base_lidar_roi_y_max)
                 self.ar_roi_boosted = False
 
-            # 시퀀스 끝나고 태그도 사라지면 재무장
-            if self.ar_t0 is not None and el >= t_left and not ar_in:
+            # 특별구역(횡단보도/빗금) 정지 차단 구간: AR 인식 후 ar_special_block_sec 동안
+            block_special = (el is not None and el < self.cfg.ar_special_block_sec)
+            # 라이다 추종점만 사용(카메라 추종점 미사용) 구간: AR 인식 후 ar_lidar_only_sec 동안
+            lidar_only = (el is not None and el < self.cfg.ar_lidar_only_sec)
+
+            # 차단 시간까지 모두 끝나고 태그도 사라지면 재무장
+            if self.ar_t0 is not None and el >= self.cfg.ar_special_block_sec and not ar_in:
                 self.ar_t0 = None
                 self.ar_armed = True
 
             if el is not None and el < t_adv:
-                # [0~adv] 차선 따라 전진
+                # [0~adv] 전진. 라이다전용 구간이면 라이다 추종점, 아니면 차선
                 mode = "AR_ADVANCE"
-                angle = self.pid_controller.compute_pid_angle(center)
+                drive_c = lidar_follow if (lidar_only and lidar_follow is not None) else center
+                angle = self.pid_controller.compute_pid_angle(drive_c)
                 self.xycar_driver.drive(angle, self.cfg.speed)
             elif el is not None and el < t_stop:
                 # [adv~adv+stop] 정지
                 mode = "AR_STOP"
                 self.xycar_driver.drive(0, 0)
             elif el is not None and el < t_left:
-                # [~+leftmost] 15도 이상 부채꼴 중 가장 왼쪽 추종
+                # [~+leftmost] 15도 이상 부채꼴 중 가장 왼쪽 추종 (추종 계수 ×ar_leftmost_gain_scale)
                 mode = "AR_LEFTMOST"
                 if gaps:
                     steer_c, _ = self.lane_follower.correct_lane_leftmost(
-                        gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
+                        gaps, self.lidar_processor.roi_ang_center,
+                        self.cfg.ar_leftmost_min_deg, self.cfg.ar_leftmost_gain_scale)
                 else:
                     steer_c = center
                 angle = self.pid_controller.compute_pid_angle(steer_c)
                 self.xycar_driver.drive(angle, self.cfg.speed)
-            elif not self.cfg.enable_special_zone:
-                # ===== 일반 차선주행 (특수구역 off) =====
-                angle = self.pid_controller.compute_pid_angle(center)
+            elif lidar_only:
+                # [t_left~ar_lidar_only_sec] 카메라 추종점 미사용, 라이다 추종점만
+                mode = "AR_LIDAR"
+                drive_c = lidar_follow if lidar_follow is not None else center
+                angle = self.pid_controller.compute_pid_angle(drive_c)
                 self.xycar_driver.drive(angle, self.cfg.speed)
-            else:
+            elif self.cfg.enable_special_zone and not block_special:
+                # ===== 특수구역 상태머신 (AR 차단 구간이 아닐 때만) =====
                 self.special_zone_controller.update_zone(now)
                 angle, speed = self.special_zone_controller.drive_special(now, center)
                 self.xycar_driver.drive(angle, speed)
+            else:
+                # ===== 일반 차선주행 (특수구역 off 또는 AR 후 차단 구간) =====
+                angle = self.pid_controller.compute_pid_angle(center)
+                self.xycar_driver.drive(angle, self.cfg.speed)
                 
             if self.show_debug:
                 # 특수구역 상태/카운트다운 (검출 오버레이는 detector 노드 자체 창)

@@ -331,8 +331,9 @@ class LaneFollower:
         self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * self.cfg.lidar_center_gain)))
         return self.lidar_c, self.bisector
 
-    def correct_lane_leftmost(self, gaps, roi_ang_center, min_deg=15.0):
+    def correct_lane_leftmost(self, gaps, roi_ang_center, min_deg=15.0, gain_scale=1.0):
         """min_deg 이상 벌어진 부채꼴 중 '가장 왼쪽'(bisector가 가장 작은=차량 좌측) 것을 추종.
+        gain_scale: 추종 계수(lidar_center_gain) 배율 (더 공격적으로 추종).
         조건 만족하는 부채꼴이 없으면 기존 최대 부채꼴 방식으로 폴백.
         실차 확인 결과 left = bisector 최소(min). 반대로 가면 min → max 로 되돌릴 것."""
         min_rad = math.radians(min_deg)
@@ -342,7 +343,8 @@ class LaneFollower:
         leftmost = min(wide, key=lambda g: (g[0] + g[1]) / 2.0)
         self.bisector = (leftmost[0] + leftmost[1]) / 2.0
         dev = roi_ang_center - self.bisector
-        self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * self.cfg.lidar_center_gain)))
+        gain = self.cfg.lidar_center_gain * gain_scale
+        self.lidar_c = max(0, min(self.cfg.width - 1, int(self.cfg.width // 2 + dev * gain)))
         return self.lidar_c, self.bisector
     
 
