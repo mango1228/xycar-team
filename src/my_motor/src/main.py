@@ -26,7 +26,7 @@ class XycarController:
         self.ar_follow = False
         self.ar_prev = False        # 직전 프레임에 AR이 보였는지
         self.ar_hold_until = 0.0    # 사라진 뒤 이 시각까지 유지
-        self.ar_hold_sec = 2.0      # 사라진 후 유지할 시간(초)
+        self.ar_hold_sec = 5.0      # 사라진 후 유지할 시간(초)
 
         if self.show_debug and not os.environ.get('DISPLAY'):
             rospy.logwarn("DISPLAY 없음 - 디버그 창 비활성화")
@@ -98,12 +98,10 @@ class XycarController:
             now = time.time()
             ar_now = self.ar_tag_detector.ar_detected and lidar_c is not None
 
-            if ar_now:
+            if ar_now and self.ar_tag_detector.get_distance():
                 # AR이 보이는 동안: 라이다 모드 (타이머는 아직 시작 안 함)
                 center = lidar_c
                 mode = "LIDAR_ONLY"
-                angle = self.pid_controller.compute_pid_angle(center)
-                self.xycar_driver.drive(angle, 0)
                 print("AR detected")
 
             if self.ar_prev and not ar_now:
@@ -113,7 +111,8 @@ class XycarController:
                     center = lidar_c
                 mode = "LIDAR_HOLD"
                 print("Now follow LIDAR")
-            elif now < self.ar_hold_until:
+            
+            if now < self.ar_hold_until:
                 # 사라진 뒤 유지 시간 안: 계속 라이다 모드
                 if lidar_c is not None:
                     center = lidar_c

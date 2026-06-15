@@ -985,12 +985,25 @@ class ARtagDetector:
     def __init__(self):
         self.last_seen = 0.0
         self.hold_sec = 0.5
+
+        self.forward_dist = None   # 전방 거리, 보통 z값
+        self.detect_dist = 0.5     # 실제 3차원 거리
+
         rospy.Subscriber("/ar_pose_marker", AlvarMarkers, self.callback, queue_size=1)
 
     def callback(self, msg):
         if len(msg.markers) > 0:
             self.last_seen = rospy.get_time()
+            # AR 마커의 위치 정보 추출
+            marker = msg.markers[0]
+            # self.distance = marker.pose.position.z
+            self.forward_dist = marker.pose.position.x
 
     @property
     def ar_detected(self):
         return (rospy.get_time() - self.last_seen) < self.hold_sec
+    
+    def get_distance(self):
+        if self.forward_dist <= self.detect_dist:
+            return True
+        return False
