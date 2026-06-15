@@ -98,11 +98,13 @@ class XycarController:
             now = time.time()
             ar_now = self.ar_tag_detector.ar_detected and lidar_c is not None
 
-            # if ar_now:
-            #     # AR이 보이는 동안: 라이다 모드 (타이머는 아직 시작 안 함)
-            #     center = lidar_c
-            #     mode = "LIDAR_ONLY"
-            #     print("AR detected")
+            if ar_now:
+                # AR이 보이는 동안: 라이다 모드 (타이머는 아직 시작 안 함)
+                center = lidar_c
+                mode = "LIDAR_ONLY"
+                angle = self.pid_controller.compute_pid_angle(center)
+                self.xycar_driver.drive(angle, 0)
+                print("AR detected")
 
             if self.ar_prev and not ar_now:
                 # ★ 보였다 → 사라진 바로 그 순간: 여기서 N초 타이머 시작
