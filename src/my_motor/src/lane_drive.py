@@ -323,15 +323,36 @@ class LaneFollower:
     
 
 class ARtagDetector:
-    def __init__(self):
+    def __init__(self, cfg):
+        self.cfg = cfg
         rospy.Subscriber('ar_pose_marker', AlvarMarkers, self.callback, queue_size=1)
-        self.detected = False     # 이번 프레임에 마커가 보였나
+        self.detected = False     # 이번 프레임에 ROI 안에서 마커가 보였나
         self.marker_id = None
-        self.distance = None      # 카메라 전방 거리(z)
+        self.distance = None      # 카메라 전방 거리(z, m)
+        self.pixel = None         # 검출 마커의 화면 픽셀 (u, v) — 디버그용
 
     def callback(self, msg):      # ← 메시지 인자 필수
-        if len(msg.markers) == 0:
+        # 마커 3D pose(미터, 카메라 광학좌표 x오른쪽/y아래/z전방)를 픽셀로 투영해서
+        # AR 전용 ROI 박스(화면 하단 40%, 좌우 전체) 안에 들어오는 마커만 인정한다.
+        best = None  # (z, id, u, v) — ROI 안에서 가장 가까운(z 최소) 마커
+        for m in msg.markers:
+            p = m.pose.pose.position
+            z = p.z
+            if z <= 0:            # 카메라 뒤/평면 마커 무시 (0 나눗셈 방지)
+                continue
+            u = self.cfg.cam_fx * p.x / z + self.cfg.cam_cx
+            v = self.cfg.cam_fy * p.y / z + self.cfg.cam_cy
+            if (self.cfg.ar_roi_left <= u <= self.cfg.ar_roi_right and
+                    self.cfg.ar_roi_top <= v <= self.cfg.ar_roi_bottom):
+                if best is None or z < best[0]:
+                    best = (z, m.id, u, v)
+
+        if best is None:          # 마커가 없거나 모두 ROI 밖
             self.detected = False
+            self.pixel = None
             return
 
-        self.detected = True
+        self.detected  = True
+        self.distance  = best[0]
+        self.marker_id = best[1]
+        self.pixel     = (int(best[2]), int(best[3]))

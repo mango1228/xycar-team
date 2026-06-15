@@ -51,10 +51,30 @@ class Config:
         self.i_clamp = rospy.get_param("~i_clamp", 300.0)
 
         # 감지 ROI (화면 하단 중앙). int() 보장: 슬라이스 인덱스/ cv2 좌표로 쓰여 float면 크래시
+        # AR 태그도 이 ROI 안에 투영되는 것만 인식 (special_zone_detector와 동일 박스)
         self.detect_roi_top    = int(rospy.get_param("~detect_roi_top", 310))
         self.detect_roi_bottom = int(rospy.get_param("~detect_roi_bottom", 420))
         self.detect_roi_left   = int(rospy.get_param("~detect_roi_left", 150))
         self.detect_roi_right  = int(rospy.get_param("~detect_roi_right", 490))
+
+        # AR 태그 3D pose(미터) -> 픽셀 투영용 카메라 내부 파라미터
+        # 기본값 = usb_cam.yaml camera_matrix (fx, fy, cx, cy)
+        self.cam_fx = rospy.get_param("~cam_fx", 340.876013)
+        self.cam_fy = rospy.get_param("~cam_fy", 341.790625)
+        self.cam_cx = rospy.get_param("~cam_cx", 333.212353)
+        self.cam_cy = rospy.get_param("~cam_cy", 241.433953)
+        # AR 태그 인정 최대 거리(m). 기본은 사실상 무제한(ROI 필터만 적용).
+        # 가까울 때만 반응시키려면 0.5 등으로 낮춰라.
+        self.ar_max_dist = rospy.get_param("~ar_max_dist", 99.0)
+
+        # AR 태그 인식 ROI (특수구역 ROI와 별개). 기본: 화면 하단 40%, 좌우 전체.
+        # height=480 기준 top=288(=480*0.6) ~ bottom=480, left=0 ~ right=640
+        self.ar_roi_top    = int(rospy.get_param("~ar_roi_top", 288))
+        self.ar_roi_bottom = int(rospy.get_param("~ar_roi_bottom", 480))
+        self.ar_roi_left   = int(rospy.get_param("~ar_roi_left", 0))
+        self.ar_roi_right  = int(rospy.get_param("~ar_roi_right", 640))
+        # AR 태그 ROI 진입 시 정지 유지 시간(초)
+        self.ar_stop_sec = rospy.get_param("~ar_stop_sec", 3.0)
 
         # 횡단보도 감지
         self.cross_white_thresh   = rospy.get_param("~cross_white_thresh", 180)

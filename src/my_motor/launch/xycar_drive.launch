@@ -7,6 +7,12 @@
   <!-- 특수구역(횡단보도/빗금) 정지: 기본 켜짐. 끄려면 special_zone:=false -->
   <arg name="special_zone" default="true" />
 
+  <!-- 특수구역 검출 ROI (special_zone_detector 전용. AR 태그는 별도 ar_roi 사용) -->
+  <arg name="detect_roi_top"    default="290" />
+  <arg name="detect_roi_bottom" default="400" />
+  <arg name="detect_roi_left"   default="150" />
+  <arg name="detect_roi_right"  default="490" />
+
   <!-- 모터 드라이버 -->
   <include file="$(find xycar_motor)/launch/xycar_motor.launch" />
 
@@ -66,6 +72,16 @@
     <param name="enable_special_zone" value="$(arg special_zone)" />
     <param name="i_clamp" value="300.0" />
 
+    <!-- AR 태그 인식 ROI (특수구역과 별개): 화면 하단 40%, 좌우 전체 -->
+    <param name="ar_roi_top"    value="288" />
+    <param name="ar_roi_bottom" value="480" />
+    <param name="ar_roi_left"   value="0" />
+    <param name="ar_roi_right"  value="640" />
+    <!-- AR 인정 최대거리(m): 99=ROI만 적용. 가까울 때만 반응하려면 0.5 등 -->
+    <param name="ar_max_dist" value="99.0" />
+    <!-- AR 태그 ROI 진입 시 정지 유지 시간(초) -->
+    <param name="ar_stop_sec" value="3.0" />
+
     <param name="cross_confirm_frames" value="1" />
     <param name="crosswalk_stop_sec" value="10.0" />
     <!-- 999 = 정지 중 오탐 복귀 검증 끔(항상 10초 정지). 켜려면 0.5 -->
@@ -88,10 +104,10 @@
     <param name="detect_hz" value="15.0" />
     <param name="show_debug" value="true" />
 
-    <param name="detect_roi_top" value="290" />
-    <param name="detect_roi_bottom" value="400" />
-    <param name="detect_roi_left" value="150" />
-    <param name="detect_roi_right" value="490" />
+    <param name="detect_roi_top"    value="$(arg detect_roi_top)" />
+    <param name="detect_roi_bottom" value="$(arg detect_roi_bottom)" />
+    <param name="detect_roi_left"   value="$(arg detect_roi_left)" />
+    <param name="detect_roi_right"  value="$(arg detect_roi_right)" />
 
     <!-- 어두운 영역 내부 흰 무늬 -->
     <param name="hatch_dark_thresh" value="80" />
