@@ -107,9 +107,8 @@ class XycarController:
             t_left  = t_stop + self.cfg.ar_leftmost_sec
             t_stop2 = t_left + self.cfg.ar_stop2_sec
 
-            # ROI 확대 유지: 왼쪽 부채꼴([t_stop~t_left]) + 2차 정지([t_left~t_stop2])
-            # → 2차 정지가 끝나는 t_stop2 에 원래 ROI 복구(출발 직전)
-            want_boost = (el is not None and t_stop <= el < t_stop2)
+            # ROI 확대는 왼쪽 부채꼴 구간([t_stop~t_left])과 동시에 적용, 부채꼴 끝나면 복구
+            want_boost = (el is not None and t_stop <= el < t_left)
             if want_boost and not self.ar_roi_boosted:
                 self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
                                              self.base_lidar_roi_y_min * self.cfg.ar_roi_forward_scale,
