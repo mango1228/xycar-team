@@ -101,7 +101,7 @@
          ROI 전방×1.5는 왼쪽~중앙 추종 전 구간에 적용 -->
     <param name="ar_advance_sec"   value="0.75" />
     <param name="ar_stop_sec"      value="0.0" />
-    <param name="ar_leftmost_sec"  value="2.0" />
+    <param name="ar_leftmost_sec"  value="2.2" />
     <param name="ar_stop2_sec"     value="0.0" />
     <param name="ar_rightmost_sec" value="0.4" />
     <param name="ar_stop3_sec"     value="0.0" />
@@ -117,9 +117,9 @@
     <param name="ar_roi_forward_scale_left"   value="2.0" />
     <!-- 중앙 추종 전방 y_min = -0.45 * 1.889 ≈ -0.85 -->
     <param name="ar_roi_forward_scale_center" value="1.889" />
-    <!-- 중앙추종 끝나고 2초 동안 전방 y_min = -0.45 * 0.5556 ≈ -0.25 (축소) -->
-    <param name="ar_after_center_sec" value="2.0" />
-    <param name="ar_roi_forward_scale_after" value="0.5556" />
+    <!-- 중앙추종 끝나고 1초 동안 전방 y_min = -0.45 * 0.7778 ≈ -0.35 (축소) -->
+    <param name="ar_after_center_sec" value="1.0" />
+    <param name="ar_roi_forward_scale_after" value="0.7778" />
     <!-- 왼쪽 부채꼴 추종 구간 추종 계수 배율 -->
     <param name="ar_leftmost_gain_scale" value="2.0" />
     <!-- AR 인식 후 특별구역(횡단보도/빗금) 정지 차단 시간(초) -->
