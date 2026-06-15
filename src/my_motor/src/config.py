@@ -74,16 +74,13 @@ class Config:
         self.ar_roi_left   = int(rospy.get_param("~ar_roi_left", 0))
         self.ar_roi_right  = int(rospy.get_param("~ar_roi_right", 640))
         # ===== AR 태그 인식 후 시퀀스 (순차 단계) =====
-        # [0~adv] 차선추종 전진 → [adv~adv+stop] 정지 → [~+leftmost] 왼쪽 부채꼴 추종
+        # [0~adv] 차선추종 전진 → [adv~adv+stop] 정지 → [~+left_steer] 하드코딩 좌조향 진입
         self.ar_advance_sec  = rospy.get_param("~ar_advance_sec", 0.5)   # 차선 따라 전진
         self.ar_stop_sec     = rospy.get_param("~ar_stop_sec", 1.0)      # 정지
-        self.ar_leftmost_sec = rospy.get_param("~ar_leftmost_sec", 2.0)  # 왼쪽 부채꼴 추종+ROI확대
-        # 왼쪽 부채꼴 후보 최소 각폭(도). 이 이상 벌어진 부채꼴 중 가장 왼쪽 선택
-        self.ar_leftmost_min_deg = rospy.get_param("~ar_leftmost_min_deg", 15.0)
-        # 왼쪽 부채꼴 추종 구간([adv+stop ~ +leftmost]) 동안 라이다 ROI 배율
-        # ar_roi_scale: 좌우 폭(x) 배율 / ar_roi_forward_scale: 전방 먼 경계(y_min) 배율
-        self.ar_roi_scale = rospy.get_param("~ar_roi_scale", 2.0)
-        self.ar_roi_forward_scale = rospy.get_param("~ar_roi_forward_scale", 1.5)
+        # 지름길 진입 하드코딩: 정지 후 고정 각도로 좌조향하며 직진하는 구간
+        # ar_left_steer_deg: 조향각(도). 음수=좌회전(표준). 실차 좌우 반대면 부호 뒤집을 것
+        self.ar_left_steer_deg = rospy.get_param("~ar_left_steer_deg", -30.0)
+        self.ar_left_steer_sec = rospy.get_param("~ar_left_steer_sec", 1.0)   # 좌조향 유지 시간
 
         # 횡단보도 감지
         self.cross_white_thresh   = rospy.get_param("~cross_white_thresh", 180)

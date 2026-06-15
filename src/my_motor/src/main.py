@@ -38,11 +38,6 @@ class XycarController:
         # AR 태그 인식 후 시퀀스 상태
         self.ar_t0 = None          # 시퀀스 시작 시각 (None=비활성)
         self.ar_armed = True       # True일 때만 새 시퀀스 트리거 (태그 사라질 때까지 재트리거 방지)
-        self.ar_roi_boosted = False
-        # 기본 라이다 ROI 백업 (시퀀스 종료 후 복귀용)
-        self.base_lidar_roi_x     = self.cfg.lidar_roi_x
-        self.base_lidar_roi_y_min = self.cfg.lidar_roi_y_min
-        self.base_lidar_roi_y_max = self.cfg.lidar_roi_y_max
 
 
         rospy.on_shutdown(self.shutdown)  # 안전 정지 (콜백 등록: 괄호 없이 함수 참조)
@@ -102,20 +97,7 @@ class XycarController:
             # ===== 단계별 주행 =====
             t_adv  = self.cfg.ar_advance_sec
             t_stop = t_adv + self.cfg.ar_stop_sec
-            t_left = t_stop + self.cfg.ar_leftmost_sec
-
-            # 왼쪽 부채꼴 구간([t_stop~t_left]) 동안만 라이다 ROI 좌우 폭 확대, 그 외엔 원복
-            want_boost = (el is not None and t_stop <= el < t_left)
-            if want_boost and not self.ar_roi_boosted:
-                self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
-                                             self.base_lidar_roi_y_min * self.cfg.ar_roi_forward_scale,
-                                             self.base_lidar_roi_y_max)
-                self.ar_roi_boosted = True
-            elif not want_boost and self.ar_roi_boosted:
-                self.lidar_processor.set_roi(self.base_lidar_roi_x,
-                                             self.base_lidar_roi_y_min,
-                                             self.base_lidar_roi_y_max)
-                self.ar_roi_boosted = False
+            t_left = t_stop + self.cfg.ar_left_steer_sec
 
             # 시퀀스 끝나고 태그도 사라지면 재무장
             if self.ar_t0 is not None and el >= t_left and not ar_in:
@@ -132,15 +114,9 @@ class XycarController:
                 mode = "AR_STOP"
                 self.xycar_driver.drive(0, 0)
             elif el is not None and el < t_left:
-                # [~+leftmost] 15도 이상 부채꼴 중 가장 왼쪽 추종
-                mode = "AR_LEFTMOST"
-                if gaps:
-                    steer_c, _ = self.lane_follower.correct_lane_leftmost(
-                        gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
-                else:
-                    steer_c = center
-                angle = self.pid_controller.compute_pid_angle(steer_c)
-                self.xycar_driver.drive(angle, self.cfg.speed)
+                # [~+left_steer] 지름길 진입: 하드코딩 좌조향으로 직진
+                mode = "AR_HARD_LEFT"
+                self.xycar_driver.drive(self.cfg.ar_left_steer_deg, self.cfg.speed)
             elif not self.cfg.enable_special_zone:
                 # ===== 일반 차선주행 (특수구역 off) =====
                 angle = self.pid_controller.compute_pid_angle(center)
