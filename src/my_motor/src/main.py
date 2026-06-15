@@ -110,8 +110,8 @@ class XycarController:
             t_stop3 = t_right + self.cfg.ar_stop3_sec
             t_center = t_stop3 + self.cfg.ar_center_sec
 
-            # ROI 확대는 왼쪽 부채꼴 구간([t_stop~t_left])과 동시에 적용, 부채꼴 끝나면 복구
-            want_boost = (el is not None and t_stop <= el < t_left)
+            # ROI 확대(전방 ×1.5): 왼쪽~중앙 추종 전 구간([t_stop~t_center], 중간 정지 포함) 유지
+            want_boost = (el is not None and t_stop <= el < t_center)
             if want_boost and not self.ar_roi_boosted:
                 self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
                                              self.base_lidar_roi_y_min * self.cfg.ar_roi_forward_scale,
@@ -177,9 +177,9 @@ class XycarController:
                 # [t_stop3~t_center] 중앙 최근접 15도 이상 부채꼴 추종 (10초)
                 mode = "AR_CENTER"
                 if gaps:
+                    # 중앙 추종은 일반 게인(×1) 사용 (왼쪽/오른쪽만 ×2)
                     steer_c, _ = self.lane_follower.correct_lane_centermost(
-                        gaps, self.lidar_processor.roi_ang_center,
-                        self.cfg.ar_leftmost_min_deg, self.cfg.ar_leftmost_gain_scale)
+                        gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
                 else:
                     steer_c = center
                 angle = self.pid_controller.compute_pid_angle(steer_c)
