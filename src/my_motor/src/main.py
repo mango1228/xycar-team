@@ -163,7 +163,8 @@ class XycarController:
                 mode = "AR_RIGHTMOST"
                 if gaps:
                     steer_c, _ = self.lane_follower.correct_lane_rightmost(
-                        gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
+                        gaps, self.lidar_processor.roi_ang_center,
+                        self.cfg.ar_leftmost_min_deg, self.cfg.ar_leftmost_gain_scale)
                 else:
                     steer_c = center
                 angle = self.pid_controller.compute_pid_angle(steer_c)
@@ -177,7 +178,8 @@ class XycarController:
                 mode = "AR_CENTER"
                 if gaps:
                     steer_c, _ = self.lane_follower.correct_lane_centermost(
-                        gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
+                        gaps, self.lidar_processor.roi_ang_center,
+                        self.cfg.ar_leftmost_min_deg, self.cfg.ar_leftmost_gain_scale)
                 else:
                     steer_c = center
                 angle = self.pid_controller.compute_pid_angle(steer_c)
