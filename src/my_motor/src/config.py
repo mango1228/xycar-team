@@ -80,8 +80,10 @@ class Config:
         self.ar_leftmost_sec = rospy.get_param("~ar_leftmost_sec", 3.0)  # 왼쪽 부채꼴 추종
         # 왼쪽 부채꼴 후보 최소 각폭(도). 이 이상 벌어진 부채꼴 중 가장 왼쪽 선택
         self.ar_leftmost_min_deg = rospy.get_param("~ar_leftmost_min_deg", 15.0)
-        # 왼쪽 부채꼴 추종 구간([adv+stop ~ +leftmost]) 동안 라이다 ROI 좌우 폭 배율
+        # 왼쪽 부채꼴 추종 구간([adv+stop ~ +leftmost]) 동안 라이다 ROI 배율
+        # ar_roi_scale: 좌우 폭(x) 배율 / ar_roi_forward_scale: 전방 먼 경계(y_min) 배율
         self.ar_roi_scale = rospy.get_param("~ar_roi_scale", 2.0)
+        self.ar_roi_forward_scale = rospy.get_param("~ar_roi_forward_scale", 1.5)
 
         # 횡단보도 감지
         self.cross_white_thresh   = rospy.get_param("~cross_white_thresh", 180)

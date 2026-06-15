@@ -108,7 +108,7 @@ class XycarController:
             want_boost = (el is not None and t_stop <= el < t_left)
             if want_boost and not self.ar_roi_boosted:
                 self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
-                                             self.base_lidar_roi_y_min,
+                                             self.base_lidar_roi_y_min * self.cfg.ar_roi_forward_scale,
                                              self.base_lidar_roi_y_max)
                 self.ar_roi_boosted = True
             elif not want_boost and self.ar_roi_boosted:
