@@ -109,12 +109,15 @@ class XycarController:
             t_right = t_stop2 + self.cfg.ar_rightmost_sec
             t_stop3 = t_right + self.cfg.ar_stop3_sec
             t_center = t_stop3 + self.cfg.ar_center_sec
+            t_stop4 = t_center + self.cfg.ar_stop4_sec
 
-            # ROI 전방 확대: 왼쪽 추종은 ×2(_left), 오른쪽/중앙 추종은 ×1.5, 그 외엔 ×1
+            # ROI 전방 배율: 왼쪽 ×2(_left), 오른쪽 ×1.5(기본), 중앙 ×0.6(_center 축소), 그 외 ×1
             if el is not None and t_stop <= el < t_left:
                 desired_f = self.cfg.ar_roi_forward_scale_left
-            elif el is not None and (t_stop2 <= el < t_right or t_stop3 <= el < t_center):
+            elif el is not None and t_stop2 <= el < t_right:
                 desired_f = self.cfg.ar_roi_forward_scale
+            elif el is not None and t_stop3 <= el < t_center:
+                desired_f = self.cfg.ar_roi_forward_scale_center
             else:
                 desired_f = 1.0
             if desired_f != self.ar_roi_cur_fscale:
@@ -185,6 +188,10 @@ class XycarController:
                     steer_c = center
                 angle = self.pid_controller.compute_pid_angle(steer_c)
                 self.xycar_driver.drive(angle, self.cfg.speed)
+            elif el is not None and el < t_stop4:
+                # [t_center~t_stop4] 중앙 추종 후 4차 정지
+                mode = "AR_STOP4"
+                self.xycar_driver.drive(0, 0)
             elif lidar_only:
                 # [t_left~ar_lidar_only_sec] 카메라 추종점 미사용, 라이다 추종점만
                 mode = "AR_LIDAR"
