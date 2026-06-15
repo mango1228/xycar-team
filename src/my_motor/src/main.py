@@ -136,6 +136,7 @@ class XycarController:
                 self.ar_t0 = None
                 self.ar_armed = True
 
+            angle = 0  # 이번 프레임 조향값 (정지 구간은 0 유지)
             if el is not None and el < t_adv:
                 # [0~adv] 전진. 라이다전용 구간이면 라이다 추종점, 아니면 차선
                 mode = "AR_ADVANCE"
@@ -162,11 +163,11 @@ class XycarController:
                 mode = "AR_STOP2"
                 self.xycar_driver.drive(0, 0)
             elif el is not None and el < t_right:
-                # [t_stop2~t_right] 재출발: 15도 이상 부채꼴 중 가장 오른쪽 추종
-                mode = "AR_RIGHTMOST"
+                # [t_stop2~t_right] 재출발: 15도 이상 부채꼴 중 중앙 최근접 추종 (구 오른쪽 추종 구간)
+                mode = "AR_CENTER1"
                 if gaps:
-                    # 오른쪽부터는 추종 게인 일반(×1) (왼쪽만 ×2)
-                    steer_c, _ = self.lane_follower.correct_lane_rightmost(
+                    # 추종 게인 일반(×1)
+                    steer_c, _ = self.lane_follower.correct_lane_centermost(
                         gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
                 else:
                     steer_c = center
@@ -217,8 +218,8 @@ class XycarController:
             count += 1
             if count % 30 == 0:
                 half_str = "%.0f" % self.image_processor.ema_half_width if self.image_processor.ema_half_width is not None else "-"
-                print("state=%s mode=%s center=%d ema_half=%s"
-                    % (self.special_zone_controller.drive_state, mode, center, half_str))
+                print("state=%s mode=%s angle=%d center=%d ema_half=%s"
+                    % (self.special_zone_controller.drive_state, mode, angle, center, half_str))
 
             self.rate.sleep()
 
