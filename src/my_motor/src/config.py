@@ -79,11 +79,11 @@ class Config:
         self.ar_stop_sec     = rospy.get_param("~ar_stop_sec", 0.0)      # 1차 정지(0=없음)
         self.ar_leftmost_sec = rospy.get_param("~ar_leftmost_sec", 1.75) # 왼쪽 부채꼴 추종+ROI확대
         self.ar_stop2_sec    = rospy.get_param("~ar_stop2_sec", 0.0)     # 2차 정지(0=없음)
-        self.ar_rightmost_sec = rospy.get_param("~ar_rightmost_sec", 1.0)  # 오른쪽 부채꼴 추종
+        self.ar_rightmost_sec = rospy.get_param("~ar_rightmost_sec", 0.6)  # 오른쪽 부채꼴 추종
         self.ar_stop3_sec     = rospy.get_param("~ar_stop3_sec", 0.0)      # 3차 정지(0=없음)
         self.ar_center_sec    = rospy.get_param("~ar_center_sec", 9.0)     # 중앙 최근접 부채꼴 추종
         self.ar_center_gain_scale = rospy.get_param("~ar_center_gain_scale", 1.1)  # 중앙 추종 게인 배율
-        self.ar_stop4_sec = rospy.get_param("~ar_stop4_sec", 1.0)  # 중앙 추종 끝난 후 4차 정지
+        self.ar_stop4_sec = rospy.get_param("~ar_stop4_sec", 0.0)  # 중앙 추종 끝난 후 4차 정지(0=없음)
         # 왼쪽 부채꼴 후보 최소 각폭(도). 이 이상 벌어진 부채꼴 중 가장 왼쪽 선택
         self.ar_leftmost_min_deg = rospy.get_param("~ar_leftmost_min_deg", 15.0)
         # 왼쪽 부채꼴 추종 구간([adv+stop ~ +leftmost]) 동안 라이다 ROI 배율
