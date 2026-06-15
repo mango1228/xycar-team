@@ -38,7 +38,7 @@ class XycarController:
         # AR 태그 인식 후 시퀀스 상태
         self.ar_t0 = None          # 시퀀스 시작 시각 (None=비활성)
         self.ar_armed = True       # True일 때만 새 시퀀스 트리거 (태그 사라질 때까지 재트리거 방지)
-        self.ar_roi_boosted = False
+        self.ar_roi_cur_fscale = 1.0   # 현재 적용된 ROI 전방 배율 (1.0=기본)
         # 기본 라이다 ROI 백업 (시퀀스 종료 후 복귀용)
         self.base_lidar_roi_x     = self.cfg.lidar_roi_x
         self.base_lidar_roi_y_min = self.cfg.lidar_roi_y_min
@@ -110,18 +110,18 @@ class XycarController:
             t_stop3 = t_right + self.cfg.ar_stop3_sec
             t_center = t_stop3 + self.cfg.ar_center_sec
 
-            # ROI 확대(전방 ×1.5): 왼쪽~중앙 추종 전 구간([t_stop~t_center], 중간 정지 포함) 유지
-            want_boost = (el is not None and t_stop <= el < t_center)
-            if want_boost and not self.ar_roi_boosted:
+            # ROI 전방 확대: 왼쪽 추종은 ×2(_left), 오른쪽/중앙 추종은 ×1.5, 그 외엔 ×1
+            if el is not None and t_stop <= el < t_left:
+                desired_f = self.cfg.ar_roi_forward_scale_left
+            elif el is not None and (t_stop2 <= el < t_right or t_stop3 <= el < t_center):
+                desired_f = self.cfg.ar_roi_forward_scale
+            else:
+                desired_f = 1.0
+            if desired_f != self.ar_roi_cur_fscale:
                 self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
-                                             self.base_lidar_roi_y_min * self.cfg.ar_roi_forward_scale,
+                                             self.base_lidar_roi_y_min * desired_f,
                                              self.base_lidar_roi_y_max)
-                self.ar_roi_boosted = True
-            elif not want_boost and self.ar_roi_boosted:
-                self.lidar_processor.set_roi(self.base_lidar_roi_x,
-                                             self.base_lidar_roi_y_min,
-                                             self.base_lidar_roi_y_max)
-                self.ar_roi_boosted = False
+                self.ar_roi_cur_fscale = desired_f
 
             # 특별구역(횡단보도/빗금) 정지 차단 구간: AR 인식 후 ar_special_block_sec 동안
             block_special = (el is not None and el < self.cfg.ar_special_block_sec)
@@ -162,9 +162,9 @@ class XycarController:
                 # [t_stop2~t_right] 재출발: 15도 이상 부채꼴 중 가장 오른쪽 추종
                 mode = "AR_RIGHTMOST"
                 if gaps:
+                    # 오른쪽부터는 추종 게인 일반(×1) (왼쪽만 ×2)
                     steer_c, _ = self.lane_follower.correct_lane_rightmost(
-                        gaps, self.lidar_processor.roi_ang_center,
-                        self.cfg.ar_leftmost_min_deg, self.cfg.ar_leftmost_gain_scale)
+                        gaps, self.lidar_processor.roi_ang_center, self.cfg.ar_leftmost_min_deg)
                 else:
                     steer_c = center
                 angle = self.pid_controller.compute_pid_angle(steer_c)
