@@ -821,6 +821,8 @@ class ImageProcessor:
             cv2.destroyAllWindows()
         except Exception:
             pass
+
+        
 class LidarProcessor:
     def __init__ (self, cfg):
         self.cfg = cfg
