@@ -75,9 +75,9 @@ class Config:
         self.ar_roi_right  = int(rospy.get_param("~ar_roi_right", 640))
         # ===== AR 태그 인식 후 시퀀스 (순차 단계) =====
         # [0~adv] 차선추종 전진 → [adv~adv+stop] 정지 → [~+leftmost] 왼쪽 부채꼴 추종
-        self.ar_advance_sec  = rospy.get_param("~ar_advance_sec", 0.75)  # 차선 따라 전진
+        self.ar_advance_sec  = rospy.get_param("~ar_advance_sec", 0.5)  # 차선 따라 전진
         self.ar_stop_sec     = rospy.get_param("~ar_stop_sec", 1.0)      # 1차 정지
-        self.ar_leftmost_sec = rospy.get_param("~ar_leftmost_sec", 2.0)  # 왼쪽 부채꼴 추종+ROI확대
+        self.ar_leftmost_sec = rospy.get_param("~ar_leftmost_sec", 2.25)  # 왼쪽 부채꼴 추종+ROI확대
         self.ar_stop2_sec    = rospy.get_param("~ar_stop2_sec", 1.0)     # 2차 정지
         self.ar_rightmost_sec = rospy.get_param("~ar_rightmost_sec", 0.8)  # 오른쪽 부채꼴 추종
         self.ar_stop3_sec     = rospy.get_param("~ar_stop3_sec", 1.0)      # 3차 정지
@@ -91,7 +91,7 @@ class Config:
         self.ar_roi_scale = rospy.get_param("~ar_roi_scale", 1.0)
         # 전방(y_min) 배율: 왼쪽 추종=_left(×2), 오른쪽 추종=기본(×1.5), 중앙 추종=_center(×0.6 축소)
         self.ar_roi_forward_scale = rospy.get_param("~ar_roi_forward_scale", 1.5)
-        self.ar_roi_forward_scale_left = rospy.get_param("~ar_roi_forward_scale_left", 1.0)
+        self.ar_roi_forward_scale_left = rospy.get_param("~ar_roi_forward_scale_left", 2.3333)  # y_min -0.45*2.3333 ≈ -1.05
         self.ar_roi_forward_scale_center = rospy.get_param("~ar_roi_forward_scale_center", 1.889)  # y_min -0.45*1.889 ≈ -0.85
         # AR 시퀀스 동안 적용할 라이다 ROI 가까운 경계(y_max). 시퀀스 끝나면 기본(-0.05) 복귀
         self.ar_roi_y_max = rospy.get_param("~ar_roi_y_max", -0.15)
