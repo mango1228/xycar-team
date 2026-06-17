@@ -39,6 +39,7 @@ class XycarController:
         self.ar_t0 = None          # 시퀀스 시작 시각 (None=비활성)
         self.ar_armed = True       # True일 때만 새 시퀀스 트리거 (태그 사라질 때까지 재트리거 방지)
         self.ar_roi_cur_fscale = 1.0   # 현재 적용된 ROI 전방 배율 (1.0=기본)
+        self.ar_roi_cur_ymax = self.cfg.lidar_roi_y_max  # 현재 적용된 ROI 가까운 경계(y_max)
         # 기본 라이다 ROI 백업 (시퀀스 종료 후 복귀용)
         self.base_lidar_roi_x     = self.cfg.lidar_roi_x
         self.base_lidar_roi_y_min = self.cfg.lidar_roi_y_min
@@ -123,11 +124,15 @@ class XycarController:
                 desired_f = self.cfg.ar_roi_forward_scale_after
             else:
                 desired_f = 1.0
-            if desired_f != self.ar_roi_cur_fscale:
+            # AR 시퀀스 활성 동안엔 y_max를 ar_roi_y_max(-0.15)로, 그 외엔 기본(-0.05)
+            ar_active = (el is not None and el < t_center + self.cfg.ar_after_center_sec)
+            desired_ymax = self.cfg.ar_roi_y_max if ar_active else self.base_lidar_roi_y_max
+            if desired_f != self.ar_roi_cur_fscale or desired_ymax != self.ar_roi_cur_ymax:
                 self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
                                              self.base_lidar_roi_y_min * desired_f,
-                                             self.base_lidar_roi_y_max)
+                                             desired_ymax)
                 self.ar_roi_cur_fscale = desired_f
+                self.ar_roi_cur_ymax = desired_ymax
 
             # 특별구역(횡단보도/빗금) 정지 차단 구간: AR 인식 후 ar_special_block_sec 동안
             block_special = (el is not None and el < self.cfg.ar_special_block_sec)
