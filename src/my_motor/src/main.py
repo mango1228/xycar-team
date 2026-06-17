@@ -124,9 +124,9 @@ class XycarController:
                 desired_f = self.cfg.ar_roi_forward_scale_after
             else:
                 desired_f = 1.0
-            # AR 시퀀스 활성 동안엔 y_max를 ar_roi_y_max(-0.15)로, 그 외엔 기본(-0.05)
-            ar_active = (el is not None and el < t_center + self.cfg.ar_after_center_sec)
-            desired_ymax = self.cfg.ar_roi_y_max if ar_active else self.base_lidar_roi_y_max
+            # 중앙추종 끝(t_center)까지만 y_max를 ar_roi_y_max(-0.15)로. 라이다 축소 구간부터는 기본(-0.05)
+            ymax_active = (el is not None and el < t_center)
+            desired_ymax = self.cfg.ar_roi_y_max if ymax_active else self.base_lidar_roi_y_max
             if desired_f != self.ar_roi_cur_fscale or desired_ymax != self.ar_roi_cur_ymax:
                 self.lidar_processor.set_roi(self.base_lidar_roi_x * self.cfg.ar_roi_scale,
                                              self.base_lidar_roi_y_min * desired_f,

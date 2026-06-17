@@ -116,12 +116,12 @@
          ROI 전방×1.5는 왼쪽~중앙 추종 전 구간에 적용 -->
     <param name="ar_advance_sec"   value="0.75" />
     <param name="ar_stop_sec"      value="1.0" />
-    <param name="ar_leftmost_sec"  value="2.2" />
+    <param name="ar_leftmost_sec"  value="2.0" />
     <param name="ar_stop2_sec"     value="1.0" />
-    <param name="ar_rightmost_sec" value="0.4" />
+    <param name="ar_rightmost_sec" value="0.8" />
     <param name="ar_stop3_sec"     value="1.0" />
     <param name="ar_center_sec"    value="7.7" />
-    <param name="ar_stop4_sec"     value="0.0" />
+    <param name="ar_stop4_sec"     value="1.0" />
     <!-- 중앙 추종 게인 배율 (오른쪽은 x1, 중앙은 x1.1) -->
     <param name="ar_center_gain_scale" value="1.1" />
     <!-- 왼쪽 부채꼴 후보 최소 각폭(도) -->
