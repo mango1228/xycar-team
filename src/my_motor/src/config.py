@@ -97,7 +97,7 @@ class Config:
         # AR 시퀀스 동안 적용할 라이다 ROI 가까운 경계(y_max). 시퀀스 끝나면 기본(-0.05) 복귀
         self.ar_roi_y_max = rospy.get_param("~ar_roi_y_max", -0.15)
         # 중앙 추종 끝난 후 이 시간(초) 동안 전방 y_min 축소 배율 적용
-        self.ar_after_center_sec = rospy.get_param("~ar_after_center_sec", 4.3)
+        self.ar_after_center_sec = rospy.get_param("~ar_after_center_sec", 4.0)
         self.ar_roi_forward_scale_after = rospy.get_param("~ar_roi_forward_scale_after", 0.5556)  # y_min -0.45*0.5556 ≈ -0.25
         # 라이다축소(after) 구간 좌우폭(x). 다른 구간은 lidar_roi_x*ar_roi_scale(=0.33) 사용
         self.ar_roi_x_after = rospy.get_param("~ar_roi_x_after", 0.25)
