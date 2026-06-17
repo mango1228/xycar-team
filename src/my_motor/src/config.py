@@ -77,15 +77,15 @@ class Config:
         # [0~adv] 차선추종 전진 → [adv~adv+stop] 정지 → [~+leftmost] 왼쪽 부채꼴 추종
         self.ar_advance_sec  = rospy.get_param("~ar_advance_sec", 0.5)  # 차선 따라 전진
         self.ar_stop_sec     = rospy.get_param("~ar_stop_sec", 1.0)      # 1차 정지
-        self.ar_leftmost_sec = rospy.get_param("~ar_leftmost_sec", 2.25)  # 왼쪽 부채꼴 추종+ROI확대
+        self.ar_leftmost_sec = rospy.get_param("~ar_leftmost_sec", 1.0)  # 왼쪽 부채꼴 추종+ROI확대
         self.ar_stop2_sec    = rospy.get_param("~ar_stop2_sec", 1.0)     # 2차 정지
-        self.ar_rightmost_sec = rospy.get_param("~ar_rightmost_sec", 0.8)  # 오른쪽 부채꼴 추종
-        self.ar_stop3_sec     = rospy.get_param("~ar_stop3_sec", 1.0)      # 3차 정지
+        self.ar_rightmost_sec = rospy.get_param("~ar_rightmost_sec", 0.0)  # 오른쪽 부채꼴 추종(제거)
+        self.ar_stop3_sec     = rospy.get_param("~ar_stop3_sec", 0.0)      # 3차 정지(오른쪽 제거로 0)
         self.ar_center_sec    = rospy.get_param("~ar_center_sec", 7.7)     # 중앙 최근접 부채꼴 추종
         self.ar_center_gain_scale = rospy.get_param("~ar_center_gain_scale", 1.1)  # 중앙 추종 게인 배율
         self.ar_stop4_sec = rospy.get_param("~ar_stop4_sec", 1.0)  # 중앙 추종 끝난 후 4차 정지
         # 왼쪽 부채꼴 후보 최소 각폭(도). 이 이상 벌어진 부채꼴 중 가장 왼쪽 선택
-        self.ar_leftmost_min_deg = rospy.get_param("~ar_leftmost_min_deg", 25.0)
+        self.ar_leftmost_min_deg = rospy.get_param("~ar_leftmost_min_deg", 15.0)
         # 왼쪽 부채꼴 추종 구간([adv+stop ~ +leftmost]) 동안 라이다 ROI 배율
         # ar_roi_scale: 좌우 폭(x) 배율 / ar_roi_forward_scale: 전방 먼 경계(y_min) 배율
         self.ar_roi_scale = rospy.get_param("~ar_roi_scale", 1.0)
@@ -99,7 +99,7 @@ class Config:
         self.ar_after_center_sec = rospy.get_param("~ar_after_center_sec", 3.3)
         self.ar_roi_forward_scale_after = rospy.get_param("~ar_roi_forward_scale_after", 0.5556)  # y_min -0.45*0.5556 ≈ -0.25
         # 라이다축소(after) 구간 좌우폭(x). 다른 구간은 lidar_roi_x*ar_roi_scale(=0.33) 사용
-        self.ar_roi_x_after = rospy.get_param("~ar_roi_x_after", 0.15)
+        self.ar_roi_x_after = rospy.get_param("~ar_roi_x_after", 0.25)
         # AR 인식 후 이 시간(초) 동안 특별구역(횡단보도/빗금) 정지 차단
         self.ar_special_block_sec = rospy.get_param("~ar_special_block_sec", 20.0)
         # AR 인식 후 이 시간(초) 동안 카메라 추종점 미사용, 라이다 추종점만 사용
