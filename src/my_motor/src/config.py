@@ -81,7 +81,7 @@ class Config:
         self.ar_stop2_sec    = rospy.get_param("~ar_stop2_sec", 1.0)     # 2차 정지
         self.ar_rightmost_sec = rospy.get_param("~ar_rightmost_sec", 0.0)  # 오른쪽 부채꼴 추종(제거)
         self.ar_stop3_sec     = rospy.get_param("~ar_stop3_sec", 0.0)      # 3차 정지(오른쪽 제거로 0)
-        self.ar_center_sec    = rospy.get_param("~ar_center_sec", 10.5)     # 중앙 최근접 부채꼴 추종
+        self.ar_center_sec    = rospy.get_param("~ar_center_sec", 9.5)     # 중앙 최근접 부채꼴 추종
         self.ar_center_gain_scale = rospy.get_param("~ar_center_gain_scale", 1.1)  # 중앙 추종 게인 배율
         self.ar_stop4_sec = rospy.get_param("~ar_stop4_sec", 1.0)  # 중앙 추종 끝난 후 4차 정지
         # 왼쪽 부채꼴 후보 최소 각폭(도). 이 이상 벌어진 부채꼴 중 가장 왼쪽 선택
@@ -96,7 +96,7 @@ class Config:
         # AR 시퀀스 동안 적용할 라이다 ROI 가까운 경계(y_max). 시퀀스 끝나면 기본(-0.05) 복귀
         self.ar_roi_y_max = rospy.get_param("~ar_roi_y_max", -0.15)
         # 중앙 추종 끝난 후 이 시간(초) 동안 전방 y_min 축소 배율 적용
-        self.ar_after_center_sec = rospy.get_param("~ar_after_center_sec", 3.3)
+        self.ar_after_center_sec = rospy.get_param("~ar_after_center_sec", 4.8)
         self.ar_roi_forward_scale_after = rospy.get_param("~ar_roi_forward_scale_after", 0.5556)  # y_min -0.45*0.5556 ≈ -0.25
         # 라이다축소(after) 구간 좌우폭(x). 다른 구간은 lidar_roi_x*ar_roi_scale(=0.33) 사용
         self.ar_roi_x_after = rospy.get_param("~ar_roi_x_after", 0.25)
