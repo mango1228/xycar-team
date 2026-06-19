@@ -41,6 +41,7 @@ class XycarController:
         self.ar_roi_cur_fscale = 1.0   # 현재 적용된 ROI 전방 배율 (1.0=기본)
         self.ar_roi_cur_ymax = self.cfg.lidar_roi_y_max  # 현재 적용된 ROI 가까운 경계(y_max)
         self.ar_roi_cur_x = self.cfg.lidar_roi_x * self.cfg.ar_roi_scale  # 현재 적용된 ROI 좌우폭(x)
+        self.ar_center_ema = None  # 중앙추종 라이다 추종점 EMA 상태 (시퀀스 시작 시 초기화)
         # 기본 라이다 ROI 백업 (시퀀스 종료 후 복귀용)
         self.base_lidar_roi_x     = self.cfg.lidar_roi_x
         self.base_lidar_roi_y_min = self.cfg.lidar_roi_y_min
@@ -98,6 +99,7 @@ class XycarController:
             if self.ar_armed and ar_in:
                 self.ar_t0 = now
                 self.ar_armed = False
+                self.ar_center_ema = None  # 새 시퀀스: 중앙추종 스무딩 상태 초기화
                 print("AR detected (id=%s) -> sequence start"
                       % self.ar_tag_detector.marker_id)
 
@@ -202,6 +204,14 @@ class XycarController:
                         self.cfg.ar_leftmost_min_deg, self.cfg.ar_center_gain_scale)
                 else:
                     steer_c = center
+                # 라이다 추종점 EMA 스무딩: 옆 블록이 들고나며 목표가 프레임마다
+                # 튀는 것을 완화 (카메라 차선 중앙과 동일한 방식). 게인 증폭 전 안정화.
+                a = self.cfg.lidar_ema_alpha
+                if self.ar_center_ema is None:
+                    self.ar_center_ema = float(steer_c)
+                else:
+                    self.ar_center_ema = a * float(steer_c) + (1.0 - a) * self.ar_center_ema
+                steer_c = int(self.ar_center_ema)
                 angle = self.pid_controller.compute_pid_angle(steer_c)
                 self.xycar_driver.drive(angle, self.cfg.speed)
             elif el is not None and el < t_stop4:
