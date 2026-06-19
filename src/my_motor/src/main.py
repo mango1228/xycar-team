@@ -130,15 +130,9 @@ class XycarController:
             # 중앙추종 끝(t_center)까지만 y_max를 ar_roi_y_max(-0.15)로. 라이다 축소 구간부터는 기본(-0.05)
             ymax_active = (el is not None and el < t_center)
             desired_ymax = self.cfg.ar_roi_y_max if ymax_active else self.base_lidar_roi_y_max
-            # 라이다축소(after) 구간 좌우폭 ar_roi_x_after, 중앙추종 구간 ar_roi_x_center(넓힘), 그 외 기본 0.33
+            # 라이다축소(after) 구간만 좌우폭 ar_roi_x_after(0.15). 그 외엔 기본 0.33
             in_after = (el is not None and t_center <= el < t_center + self.cfg.ar_after_center_sec)
-            in_center_roi = (el is not None and t_stop3 <= el < t_center)
-            if in_after:
-                desired_x = self.cfg.ar_roi_x_after
-            elif in_center_roi:
-                desired_x = self.cfg.ar_roi_x_center
-            else:
-                desired_x = self.base_lidar_roi_x * self.cfg.ar_roi_scale
+            desired_x = self.cfg.ar_roi_x_after if in_after else (self.base_lidar_roi_x * self.cfg.ar_roi_scale)
             if (desired_f != self.ar_roi_cur_fscale or desired_ymax != self.ar_roi_cur_ymax
                     or desired_x != self.ar_roi_cur_x):
                 self.lidar_processor.set_roi(desired_x,

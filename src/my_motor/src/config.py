@@ -101,8 +101,6 @@ class Config:
         self.ar_roi_forward_scale_after = rospy.get_param("~ar_roi_forward_scale_after", 0.5556)  # y_min -0.45*0.5556 ≈ -0.25
         # 라이다축소(after) 구간 좌우폭(x). 다른 구간은 lidar_roi_x*ar_roi_scale(=0.33) 사용
         self.ar_roi_x_after = rospy.get_param("~ar_roi_x_after", 0.25)
-        # 중앙추종(center) 구간 좌우폭(x). 측면 블럭을 일찍 감지하려고 기본(0.33)보다 넓힘
-        self.ar_roi_x_center = rospy.get_param("~ar_roi_x_center", 0.45)
         # AR 인식 후 이 시간(초) 동안 특별구역(횡단보도/빗금) 정지 차단
         self.ar_special_block_sec = rospy.get_param("~ar_special_block_sec", 20.0)
         # AR 인식 후 이 시간(초) 동안 카메라 추종점 미사용, 라이다 추종점만 사용
