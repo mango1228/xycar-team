@@ -93,7 +93,7 @@ class Config:
         # 전방(y_min) 배율: 왼쪽 추종=_left(×2), 오른쪽 추종=기본(×1.5), 중앙 추종=_center(×0.6 축소)
         self.ar_roi_forward_scale = rospy.get_param("~ar_roi_forward_scale", 1.5)
         self.ar_roi_forward_scale_left = rospy.get_param("~ar_roi_forward_scale_left", 2.3333)  # y_min -0.45*2.3333 ≈ -1.05
-        self.ar_roi_forward_scale_center = rospy.get_param("~ar_roi_forward_scale_center", 1.889)  # y_min -0.45*1.889 ≈ -0.85
+        self.ar_roi_forward_scale_center = rospy.get_param("~ar_roi_forward_scale_center", 2.222)  # y_min -0.45*2.222 ≈ -1.0 (블럭 일찍 감지→조향 일찍)
         # AR 시퀀스 동안 적용할 라이다 ROI 가까운 경계(y_max). 시퀀스 끝나면 기본(-0.05) 복귀
         self.ar_roi_y_max = rospy.get_param("~ar_roi_y_max", -0.15)
         # 중앙 추종 끝난 후 이 시간(초) 동안 전방 y_min 축소 배율 적용
