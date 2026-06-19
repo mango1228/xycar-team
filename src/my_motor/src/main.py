@@ -4,6 +4,7 @@
 import rospy
 import os
 import time
+import math
 from std_msgs.msg import Int8
 from config import Config
 from lane_drive import ImageProcessor, LidarProcessor, XycarDriver, LaneFollower, ARtagDetector
@@ -42,6 +43,7 @@ class XycarController:
         self.ar_roi_cur_ymax = self.cfg.lidar_roi_y_max  # 현재 적용된 ROI 가까운 경계(y_max)
         self.ar_roi_cur_x = self.cfg.lidar_roi_x * self.cfg.ar_roi_scale  # 현재 적용된 ROI 좌우폭(x)
         self.ar_center_ema = None  # 중앙추종 라이다 추종점 EMA 상태 (시퀀스 시작 시 초기화)
+        self.prev_mode = None      # 직전 프레임 주행 모드 (모드 전환 감지 → PID 리셋용)
         # 기본 라이다 ROI 백업 (시퀀스 종료 후 복귀용)
         self.base_lidar_roi_x     = self.cfg.lidar_roi_x
         self.base_lidar_roi_y_min = self.cfg.lidar_roi_y_min
@@ -197,9 +199,10 @@ class XycarController:
             elif el is not None and el < t_center:
                 # [t_stop3~t_center] 중앙 최근접 15도 이상 부채꼴 추종 (10초)
                 mode = "AR_CENTER"
+                bis = None
                 if gaps:
                     # 중앙 추종은 게인 ×ar_center_gain_scale(기본 0.6)
-                    steer_c, _ = self.lane_follower.correct_lane_centermost(
+                    steer_c, bis = self.lane_follower.correct_lane_centermost(
                         gaps, self.lidar_processor.roi_ang_center,
                         self.cfg.ar_leftmost_min_deg, self.cfg.ar_center_gain_scale)
                 else:
@@ -214,6 +217,19 @@ class XycarController:
                 steer_c = int(self.ar_center_ema)
                 angle = self.pid_controller.compute_pid_angle(steer_c)
                 self.xycar_driver.drive(angle, self.cfg.speed)
+                # --- 진단 로그: 부채꼴 후보(폭 w / 중앙편차 d, 단위 deg)와
+                #     선택된 추종점의 dev, 최종 조향 angle. 충돌 직전 값을 보면
+                #     (a) angle이 ±50 포화인지  (b) dev가 작은지(추종 대상 문제)
+                #     (c) 비슷한 폭의 옆 부채꼴을 골랐는지 한눈에 확인 가능.
+                c0 = self.lidar_processor.roi_ang_center
+                glist = " ".join(
+                    "[w%.0f d%.0f]" % (math.degrees(g[1] - g[0]),
+                                       math.degrees(c0 - (g[0] + g[1]) / 2.0))
+                    for g in gaps)
+                chosen_dev = math.degrees(c0 - bis) if bis is not None else 0.0
+                rospy.loginfo_throttle(0.2,
+                    "AR_CENTER gaps=%d %s | chosen_dev=%.0f steer_c=%d angle=%d" %
+                    (len(gaps), glist, chosen_dev, steer_c, angle))
             elif el is not None and el < t_stop4:
                 # [t_center~t_stop4] 중앙 추종 후 4차 정지
                 mode = "AR_STOP4"
@@ -221,6 +237,11 @@ class XycarController:
             elif el is not None and el < t_after:
                 # [t_stop4~t_after] ROI 축소 구간: 카메라 미사용, 라이다 추종점만
                 mode = "AR_AFTER_CENTER"
+                # 중앙추종(×1.95, EMA)에서 빠져나오는 순간, 키워놨던 PID의
+                # 적분(I)·미분(D) 누적이 그대로 넘어와 전환 스파이크 → 진동을
+                # 유발한다. 이 모드 진입 첫 프레임에 PID를 리셋해 와인드업 제거.
+                if self.prev_mode == "AR_CENTER":
+                    self.pid_controller.reset_pid()
                 drive_c = lidar_follow if lidar_follow is not None else center
                 angle = self.pid_controller.compute_pid_angle(drive_c)
                 self.xycar_driver.drive(angle, self.cfg.speed)
@@ -250,6 +271,7 @@ class XycarController:
                     self.special_zone_controller.draw_status(frame, now)
                 self.image_processor.draw_debug(frame, center, mode, left, right, cam_center, lidar_c, lpos, rpos, corner, left_slope)
 
+            self.prev_mode = mode   # 다음 프레임의 모드 전환 감지용
             count += 1
             if count % 30 == 0:
                 half_str = "%.0f" % self.image_processor.ema_half_width if self.image_processor.ema_half_width is not None else "-"
