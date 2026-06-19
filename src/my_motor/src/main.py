@@ -235,18 +235,15 @@ class XycarController:
                 mode = "AR_STOP4"
                 self.xycar_driver.drive(0, 0)
             elif el is not None and el < t_after:
-                # [t_stop4~t_after] 지름길 탈출 구간: 카메라 차선 중앙으로 주행.
-                # 빠져나오면 양쪽 차선이 정상적으로 보이므로, 프레임마다 튀는 raw
-                # 라이다 추종점(가장 큰 부채꼴) 대신 안정적인 카메라 중앙을 따른다.
-                # → 중앙추종(라이다)→카메라로 추종 대상이 한 번에 바뀌며 생기던
-                #   급스윙/차선이탈(out)을 방지.
+                # [t_stop4~t_after] ROI 축소 구간: 카메라 미사용, 라이다 추종점만
                 mode = "AR_AFTER_CENTER"
                 # 중앙추종(×1.95, EMA)에서 빠져나오는 순간, 키워놨던 PID의
                 # 적분(I)·미분(D) 누적이 그대로 넘어와 전환 스파이크 → 진동을
                 # 유발한다. 이 모드 진입 첫 프레임에 PID를 리셋해 와인드업 제거.
                 if self.prev_mode == "AR_CENTER":
                     self.pid_controller.reset_pid()
-                angle = self.pid_controller.compute_pid_angle(center)
+                drive_c = lidar_follow if lidar_follow is not None else center
+                angle = self.pid_controller.compute_pid_angle(drive_c)
                 self.xycar_driver.drive(angle, self.cfg.speed)
             elif el is not None and el < t_stop5:
                 # [t_after~t_stop5] 라이다축소 후 5차 정지
