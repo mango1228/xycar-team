@@ -119,17 +119,18 @@ class SpecialZoneController:
                             self.hatch_consecutive = 0
     
     def state_hatch_advance(self, now, center):
-        # 빗금 확정 후 차선 따라 전진 → 시간 다 되면 영구 정지
+        # 빗금 확정 후 차선 따라 전진 → 시간 다 되면 재출발(검증용: 영구정지 해제)
         if now - self.advance_start >= self.cfg.hatch_advance_sec:
-            rospy.loginfo("[special_zone] 빗금 전진 완료 -> 영구 정지")
-            self.drive_state = self.STATE_HATCH_STOP
-            # self.xycar_driver.drive(0, 0)
-            angle = 0
-            speed = 0
-        else:
-            angle = self.pid_controller.compute_pid_angle(center)
-            speed = self.cfg.speed
-            # self.xycar_driver.drive(angle, self.cfg.speed)
+            rospy.loginfo("[special_zone] 빗금 전진 완료 -> 재출발(검증용, +%.1f초 유예)"
+                          % self.cfg.post_resume_grace_sec)
+            # 같은 빗금에 바로 재트리거되지 않도록 유예 + 카운터/PID 리셋 후 주행 복귀
+            self.resume_grace_until = now + self.cfg.post_resume_grace_sec
+            self.hatch_consecutive  = 0
+            self.hatch_miss         = 0
+            self.pid_controller.reset_pid()
+            self.drive_state = self.STATE_DRIVE
+        angle = self.pid_controller.compute_pid_angle(center)
+        speed = self.cfg.speed
         return angle, speed
 
     def state_crosswalk_stop(self, now):
