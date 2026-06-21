@@ -5,7 +5,7 @@
   <!-- RViz: 실행 안 하려면 rviz:=false -->
   <arg name="rviz" default="true" />
   <!-- 특수구역(횡단보도/빗금) 정지: 기본 켜짐. 끄려면 special_zone:=false -->
-  <arg name="special_zone" default="true" />
+  <arg name="special_zone" default="false" />
   <!-- AR 태그 검출 노드: 기본 켜짐. 끄려면 ar_tag:=false -->
   <arg name="ar_tag" default="true" />
   <!-- AR 마커 한 변 실제 크기(cm) -->
