@@ -82,7 +82,7 @@ class Config:
         self.ar_rightmost_sec = rospy.get_param("~ar_rightmost_sec", 0.0)  # 오른쪽 부채꼴 추종(제거)
         self.ar_stop3_sec     = rospy.get_param("~ar_stop3_sec", 0.0)      # 3차 정지(오른쪽 제거로 0)
         self.ar_center_sec    = rospy.get_param("~ar_center_sec", 9.5)     # 중앙 최근접 부채꼴 추종
-        self.ar_center_gain_scale = rospy.get_param("~ar_center_gain_scale", 2.05)  # 중앙 추종 게인 배율(장애물 회피 강화)
+        self.ar_center_gain_scale = rospy.get_param("~ar_center_gain_scale", 2.5)  # 중앙 추종 게인 배율(장애물 회피 강화)
         self.ar_stop4_sec = rospy.get_param("~ar_stop4_sec", 0.0)  # 중앙 추종 끝난 후 4차 정지(제거)
         self.ar_stop5_sec = rospy.get_param("~ar_stop5_sec", 0.0)  # 라이다축소 구간 끝난 후 5차 정지(제거)
         # 왼쪽 부채꼴 후보 최소 각폭(도). 이 이상 벌어진 부채꼴 중 가장 왼쪽 선택
