@@ -122,7 +122,7 @@
     <param name="ar_stop3_sec"     value="0.0" />
     <param name="ar_center_sec"    value="9.5" />
     <param name="ar_stop4_sec"     value="0.0" />
-    <param name="ar_stop5_sec"     value="0.0" />
+    <param name="ar_stop5_sec"     value="5.0" />
     <!-- 중앙 추종 게인 배율 (오른쪽은 x1, 중앙은 x1.1) -->
     <param name="ar_center_gain_scale" value="1.1" />
     <!-- 왼쪽 부채꼴 후보 최소 각폭(도) -->
