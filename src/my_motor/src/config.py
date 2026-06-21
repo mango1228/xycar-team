@@ -106,7 +106,7 @@ class Config:
         # AR 인식 후 이 시간(초) 동안 카메라 추종점 미사용, 라이다 추종점만 사용
         self.ar_lidar_only_sec = rospy.get_param("~ar_lidar_only_sec", 10.0)
         # 부채꼴 추종 구간(왼쪽/오른쪽/중앙) 전체에 적용되는 추종 계수(lidar_center_gain) 배율
-        self.ar_leftmost_gain_scale = rospy.get_param("~ar_leftmost_gain_scale", 2.0)
+        self.ar_leftmost_gain_scale = rospy.get_param("~ar_leftmost_gain_scale", 1.9)
 
         # 횡단보도 감지
         self.cross_white_thresh   = rospy.get_param("~cross_white_thresh", 180)
