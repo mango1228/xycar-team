@@ -105,7 +105,7 @@ class Config:
         # 라이다축소(after) 구간 좌우폭(x). 다른 구간은 lidar_roi_x*ar_roi_scale(=0.33) 사용
         self.ar_roi_x_after = rospy.get_param("~ar_roi_x_after", 0.25)
         # AR 인식 후 이 시간(초) 동안 특별구역(횡단보도/빗금) 정지 차단
-        self.ar_special_block_sec = rospy.get_param("~ar_special_block_sec", 26.0)
+        self.ar_special_block_sec = rospy.get_param("~ar_special_block_sec", 20.0)
         # AR 인식 후 이 시간(초) 동안 카메라 추종점 미사용, 라이다 추종점만 사용
         self.ar_lidar_only_sec = rospy.get_param("~ar_lidar_only_sec", 10.0)
         # 부채꼴 추종 구간(왼쪽/오른쪽/중앙) 전체에 적용되는 추종 계수(lidar_center_gain) 배율

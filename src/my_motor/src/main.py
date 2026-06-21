@@ -121,7 +121,6 @@ class XycarController:
             t_straight = t_stop5 + 0.5                          # 좌회전 전 직진 0.5초(하드코딩)
             t_lturn = t_straight + 1.3                          # 1.3초 고정 좌회전(하드코딩)
             t_straight2 = t_lturn + 0.7                         # 좌회전 후 직진 0.7초(하드코딩)
-            t_stop6 = t_straight2 + 5.0                         # 직진 후 6차 정지 5초(하드코딩)
 
             # ROI 전방 배율: 왼쪽 ×2(_left), 오른쪽 ×1.5(기본), 중앙 ×0.6(_center 축소), 그 외 ×1
             if el is not None and t_stop <= el < t_left:
@@ -265,10 +264,6 @@ class XycarController:
                 # [t_lturn~t_straight2] 좌회전 후 직진 0.7초 (하드코딩: 조향 0)
                 mode = "AR_STRAIGHT2"
                 self.xycar_driver.drive(0, self.cfg.speed)
-            elif el is not None and el < t_stop6:
-                # [t_straight2~t_stop6] 직진 후 6차 정지 5초 (하드코딩)
-                mode = "AR_STOP6"
-                self.xycar_driver.drive(0, 0)
             elif lidar_only:
                 # [t_left~ar_lidar_only_sec] 카메라 추종점 미사용, 라이다 추종점만
                 mode = "AR_LIDAR"
