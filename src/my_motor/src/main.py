@@ -45,6 +45,7 @@ class XycarController:
         self.base_lidar_roi_x     = self.cfg.lidar_roi_x
         self.base_lidar_roi_y_min = self.cfg.lidar_roi_y_min
         self.base_lidar_roi_y_max = self.cfg.lidar_roi_y_max
+        self.last_logged_mode = None
 
 
         rospy.on_shutdown(self.shutdown)  # 안전 정지 (콜백 등록: 괄호 없이 함수 참조)
@@ -138,6 +139,14 @@ class XycarController:
                 self.lidar_processor.set_roi(desired_x,
                                              self.base_lidar_roi_y_min * desired_f,
                                              desired_ymax)
+                rospy.loginfo(
+                    "AR ROI update: el=%s x=%.3f y_min=%.3f y_max=%.3f fscale=%.4f"
+                    % ("%.2f" % el if el is not None else "-",
+                       desired_x,
+                       self.base_lidar_roi_y_min * desired_f,
+                       desired_ymax,
+                       desired_f)
+                )
                 self.ar_roi_cur_fscale = desired_f
                 self.ar_roi_cur_ymax = desired_ymax
                 self.ar_roi_cur_x = desired_x
@@ -233,7 +242,25 @@ class XycarController:
                 # ===== 일반 차선주행 (특수구역 off 또는 AR 후 차단 구간) =====
                 angle = self.pid_controller.compute_pid_angle(center)
                 self.xycar_driver.drive(angle, self.cfg.speed)
-                
+
+            # 로그 출력
+            if mode != self.last_logged_mode:
+                rospy.loginfo(
+                    "MODE -> %s | el=%s angle=%d center=%d cam=%d lidar=%s gaps=%d roi=(x=%.3f,y_min=%.3f,y_max=%.3f)"
+                    % (mode,
+                       "%.2f" % el if el is not None else "-",
+                       angle,
+                       center,
+                       cam_center,
+                       "%d" % lidar_follow if lidar_follow is not None else "-",
+                       len(gaps),
+                       self.cfg.lidar_roi_x,
+                       self.cfg.lidar_roi_y_min,
+                       self.cfg.lidar_roi_y_max)
+                )
+                self.last_logged_mode = mode
+            #  
+
             if self.show_debug:
                 # 특수구역 상태/카운트다운 (검출 오버레이는 detector 노드 자체 창)
                 if self.cfg.enable_special_zone:
