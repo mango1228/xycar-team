@@ -132,7 +132,7 @@
     <param name="ar_roi_forward_scale"        value="1.5" />
     <param name="ar_roi_forward_scale_left"   value="2.3333" />
     <!-- 중앙 추종 전방 y_min = -0.45 * 1.889 ≈ -0.85 -->
-    <param name="ar_roi_forward_scale_center" value="1.889" />
+    <param name="ar_roi_forward_scale_center" value="2.2222" />
     <!-- AR 시퀀스 동안 라이다 ROI 가까운 경계(y_max). 끝나면 기본 -0.05 복귀 -->
     <param name="ar_roi_y_max" value="-0.15" />
     <!-- 라이다축소 구간: 3.3초, 전방 y_min=-0.45*0.5556≈-0.25, 좌우 x=0.15 -->
