@@ -87,7 +87,7 @@ class Config:
         # 튀는 것을 완화. 1=스무딩 없음(생값), 작을수록 부드럽지만 반응 지연↑
         self.lidar_ema_alpha = rospy.get_param("~lidar_ema_alpha", 0.8)
         self.ar_stop4_sec = rospy.get_param("~ar_stop4_sec", 0.0)  # 중앙 추종 끝난 후 4차 정지(제거)
-        self.ar_stop5_sec = rospy.get_param("~ar_stop5_sec", 5.0)  # 라이다축소(AR_AFTER_CENTER) 구간 끝난 후 5차 정지 5초
+        self.ar_stop5_sec = rospy.get_param("~ar_stop5_sec", 0.0)  # 5차 정지(제거)
         # 왼쪽 부채꼴 후보 최소 각폭(도). 이 이상 벌어진 부채꼴 중 가장 왼쪽 선택
         self.ar_leftmost_min_deg = rospy.get_param("~ar_leftmost_min_deg", 15.0)
         # 왼쪽 부채꼴 추종 구간([adv+stop ~ +leftmost]) 동안 라이다 ROI 배율
