@@ -118,6 +118,7 @@ class XycarController:
             t_stop4 = t_center + self.cfg.ar_stop4_sec
             t_after = t_center + self.cfg.ar_after_center_sec   # 라이다축소 끝 (t_center 기준)
             t_stop5 = t_after + self.cfg.ar_stop5_sec           # 라이다축소 후 5차 정지
+            t_lturn = t_stop5 + 0.5                             # 5차 정지 후 0.5초 고정 좌회전(하드코딩)
 
             # ROI 전방 배율: 왼쪽 ×2(_left), 오른쪽 ×1.5(기본), 중앙 ×0.6(_center 축소), 그 외 ×1
             if el is not None and t_stop <= el < t_left:
@@ -249,6 +250,10 @@ class XycarController:
                 # [t_after~t_stop5] 라이다축소 후 5차 정지
                 mode = "AR_STOP5"
                 self.xycar_driver.drive(0, 0)
+            elif el is not None and el < t_lturn:
+                # [t_stop5~t_lturn] 5차 정지 후 0.5초 고정 좌회전 (하드코딩: 조향 -50=최대 좌)
+                mode = "AR_LTURN"
+                self.xycar_driver.drive(-50, self.cfg.speed)
             elif lidar_only:
                 # [t_left~ar_lidar_only_sec] 카메라 추종점 미사용, 라이다 추종점만
                 mode = "AR_LIDAR"
