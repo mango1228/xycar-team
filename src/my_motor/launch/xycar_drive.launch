@@ -142,7 +142,7 @@
     <!-- 왼쪽 부채꼴 추종 구간 추종 계수 배율 -->
     <param name="ar_leftmost_gain_scale" value="2.0" />
     <!-- AR 인식 후 특별구역(횡단보도/빗금) 정지 차단 시간(초) -->
-    <param name="ar_special_block_sec" value="20.0" />
+    <param name="ar_special_block_sec" value="26.0" />
     <!-- AR 인식 후 카메라 추종점 미사용(라이다 추종점만) 시간(초) -->
     <param name="ar_lidar_only_sec" value="10.0" />
 
