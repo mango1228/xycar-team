@@ -147,7 +147,7 @@ class SpecialZoneController:
         return angle, speed
 
     def state_drive(self, now, center):
-        if self.cross_consecutive >= self.cfg.cross_confirm_frames:
+        if self.cfg.enable_crosswalk_stop and self.cross_consecutive >= self.cfg.cross_confirm_frames:
             rospy.loginfo("[special_zone] 횡단보도 감지 -> 정지(검증)")
             self.drive_state       = self.STATE_CROSSWALK_STOP
             self.stop_start_time   = now

@@ -45,6 +45,9 @@ class Config:
         # ===== 특수구역(횡단보도/빗금) 정지 =====
         # 마스터 토글 (false면 특수구역 감지/상태머신 미진입, 기존 차선주행과 동일)
         self.enable_special_zone = rospy.get_param("~enable_special_zone", False)
+        # 횡단보도 정지만 별도로 끄는 토글 (false면 횡단보도 감지해도 정지 안 함).
+        # 빗금(사선 주차) 정지는 enable_special_zone 으로 별개 유지.
+        self.enable_crosswalk_stop = rospy.get_param("~enable_crosswalk_stop", True)
         # 특수구역 검출 노드(special_zone_detector) 실행 주기(Hz). 주행 루프와 분리됨.
         self.detect_hz = float(rospy.get_param("~detect_hz", 15.0))
         # PID 적분 와인드업 클램프 (±)
