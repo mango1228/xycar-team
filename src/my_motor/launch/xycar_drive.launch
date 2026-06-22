@@ -146,6 +146,8 @@
     <!-- AR 인식 후 카메라 추종점 미사용(라이다 추종점만) 시간(초) -->
     <param name="ar_lidar_only_sec" value="10.0" />
 
+    <!-- 횡단보도 정지만 끔 (빗금 정지는 유지). 켜려면 true -->
+    <param name="enable_crosswalk_stop" value="false" />
     <param name="cross_confirm_frames" value="1" />
     <param name="crosswalk_stop_sec" value="10.0" />
     <!-- 999 = 정지 중 오탐 복귀 검증 끔(항상 10초 정지). 켜려면 0.5 -->
